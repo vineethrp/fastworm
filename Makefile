@@ -10,7 +10,7 @@ BIN_DIR = $(BLD_DIR)/bin
 SEGMENTER = $(BIN_DIR)/segmenter
 
 CC=gcc
-CFLAGS += -g
+CFLAGS += -g -O0
 CFLAGS += -std=gnu99
 CFLAGS += -Wall -Werror
 CFLAGS += -I$(INC_DIR)
