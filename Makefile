@@ -18,6 +18,7 @@ CFLAGS += -I$(INC_DIR)
 LDLIBS = -lm
 
 SEGMENTER_OBJS = \
+								 log.o \
 								 segmenter.o
 
 .PHONY: all

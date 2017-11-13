@@ -2,3 +2,4 @@ build/*
 build/objs/*
 build/deps/*
 build/bin/*
+*.log

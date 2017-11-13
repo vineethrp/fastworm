@@ -3,7 +3,7 @@
 #include <string.h>
 #include <argp.h>
 
-
+#include "log.h"
 #include "segmenter.h"
 
 const char *argp_program_version = SEGMENTER_VERSION_STR;
@@ -11,6 +11,7 @@ const char *argp_program_bug_address = "vpillai3@hawk.iit.edu";
 
 static char doc[] = "segmenter -- A program to extract worm centroid from image";
 
+void init_options(prog_args_t *);
 int validate_options(prog_args_t *);
 int parse_options(int, char *, struct argp_state *);
 
@@ -19,7 +20,7 @@ main(int argc, char **argv)
 {
 
   prog_args_t prog_args;
-  bzero(&prog_args, sizeof(prog_args));
+  init_options(&prog_args);
   struct argp_option options[] = {
     {"project",         'P', "NAME",       0,                    "The name of the project to process."},
     {"input",           'i', "PATH",       0,  "Path to input images."},
@@ -46,6 +47,14 @@ main(int argc, char **argv)
   if (validate_options(&prog_args) < 0) {
     exit(1);
   }
+
+  if (log_init(prog_args.verbosity, 0, prog_args.logfile) < 0) {
+    exit (1);
+  }
+
+  LOG_INFO("Starting Segmenter");
+
+  log_fini();
 
 }
 
@@ -117,6 +126,12 @@ parse_options(int key, char *arg, struct argp_state *state)
   return 0;
 }
 
+void
+init_options(prog_args_t *prog_args)
+{
+  bzero(prog_args, sizeof(prog_args_t));
+}
+
 int
 validate_options(prog_args_t *prog_args)
 {
@@ -177,7 +192,11 @@ validate_options(prog_args_t *prog_args)
     prog_args->thresh_ratio = PROG_ARGS_DEFAULT_THRESH_RATIO;
   }
 
-  if (prog_args->verbosity) {
+  if (prog_args < LOG_ERR) {
+    prog_args->verbosity = LOG_INFO;
+  }
+
+  if (prog_args->verbosity > LOG_INFO) {
     fprintf(stdout, "Program options:\n");
     fprintf(stdout, "Project: %s, Input: %s, Output: %s\n",
         prog_args->project, prog_args->input, prog_args->output);

@@ -21,7 +21,7 @@ typedef struct prog_args_s {
   int srch_winsz;
   int thresh_winsz;
   float thresh_ratio;
-  int verbosity;
+  loglevel_t verbosity;
 } prog_args_t;
 
 #define PROG_ARGS_DEFAULT_INPUT "data"
