@@ -17,9 +17,10 @@ CFLAGS += -I$(INC_DIR)
 
 LDLIBS = -lm
 
-SEGMENTER_OBJS = \
-								 log.o \
-								 segmenter.o
+SEGMENTER_OBJS = 								\
+								 log.o 					\
+								 main.o					\
+								 segmentation.o
 
 .PHONY: all
 
