@@ -118,8 +118,8 @@ log_write(loglevel_t loglevel, const char *format, ...)
   }
 
   buf_ptr[0] = '\n';
-  buf_ptr[1] = '\0';
-  ret += 2;
+  //buf_ptr[1] = '\0';
+  ret += 1;
 
   if ((uintptr_t)(logbuf_ptr - logbuf + ret) > logbuf_sz) {
     log_rotated = true;

@@ -5,6 +5,7 @@
 
 #include "log.h"
 #include "segmenter.h"
+#include "segmentation.h"
 
 const char *argp_program_version = SEGMENTER_VERSION_STR;
 const char *argp_program_bug_address = "vpillai3@hawk.iit.edu";
@@ -19,6 +20,7 @@ int
 main(int argc, char **argv)
 {
 
+  worm_data_t worm_data = { 0 };
   prog_args_t prog_args;
   init_options(&prog_args);
   struct argp_option options[] = {
@@ -53,6 +55,8 @@ main(int argc, char **argv)
   }
 
   LOG_INFO("Starting Segmenter");
+  find_centroid("data/0000000.jpg", &worm_data);
+  //find_centroid("kathu.jpg", &worm_data);
 
   log_fini();
 
