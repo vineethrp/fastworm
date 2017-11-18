@@ -22,6 +22,7 @@ CFLAGS += -I$(INC_DIR)
 LDLIBS = -lm -lpthread
 
 SEGMENTER_OBJS = 										\
+								 argparser.o				\
 								 largestcomponent.o	\
 								 log.o 							\
 								 main.o							\
