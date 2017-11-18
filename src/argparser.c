@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <argp.h>
 
@@ -33,6 +34,7 @@ struct argp_option options[] = {
   {"thresh_ratio",    'T', "FLOAT",      0,  "Pixel intensity."},
   {"logfile",         'l', "FILE PATH",  0,  "Path to log file."},
   {"verbose",         'v', 0, 0,  "Produce verbose output."},
+  {"debug",           'd', 0, 0, "Enable creation of debug images"},
   { 0 }
 };
 
@@ -112,6 +114,9 @@ parse_options(int key, char *arg, struct argp_state *state)
       break;
     case 'v':
       prog_args->verbosity++;
+      break;
+    case 'd':
+      debug_run = true;
       break;
     default:
       return ARGP_ERR_UNKNOWN;

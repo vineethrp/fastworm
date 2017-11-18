@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include "log.h"
@@ -7,12 +8,13 @@
 #include "segmenter.h"
 #include "segmentation.h"
 
+bool debug_run = false;
 
 int
 main(int argc, char **argv)
 {
+  segdata_t segdata = { 0 };;
 
-  worm_data_t worm_data = { 0 };
   prog_args_t prog_args;
 
   if (parse_arguments(argc, argv, &prog_args) < 0) {
@@ -25,10 +27,14 @@ main(int argc, char **argv)
   }
 
   LOG_INFO("Starting Segmenter");
-  find_centroid("data/0000000.jpg", &worm_data);
-  //find_centroid("kathu.jpg", &worm_data);
+  if (segdata_init(&prog_args, "data/0000000.jpg", &segdata) < 0) {
+    LOG_ERR("Failed to initialize segdata");
+    goto out;
+  }
+  segdata_process(&segdata);
+  segdata_fini(&segdata);
+out:
 
   log_fini();
-
 }
 

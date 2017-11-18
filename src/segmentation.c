@@ -1,40 +1,185 @@
+#include <stdbool.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <string.h>
+#include <errno.h>
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#include <stdbool.h>
 
-#include "segmentation.h"
+#include "segmenter.h"
 #include "log.h"
+#include "argparser.h"
+#include "segmentation.h"
 #include "largestcomponent.h"
 
 static int threshold_neighbor_sz = 25;
 static float threshold_ratio = 0.9;
 
-static int write_threshold(bool *threashold_data, int w, int h);
+static int write_threshold(char *filename,
+    bool *threshold_data, unsigned char *data, int w, int h);
 
-unsigned char *
-greyscale_blur(unsigned char *data, int w, int h, int box_len)
+int
+segdata_init(prog_args_t *args, char *filename, segdata_t *segdata)
+{
+
+  if (segdata == NULL) {
+    LOG_ERR("segdata_init: Invalid argument passed!");
+    return -1;
+  }
+
+  /*
+   * Initialize all the buffers.
+   */
+  segdata->hblur_data = (unsigned char *)calloc(MAX_IMGBUF_SZ, sizeof(unsigned char));
+  if (segdata->hblur_data == NULL) {
+    LOG_ERR("Failed to allocate hblur_data");
+    goto out;
+  }
+  segdata->blur_data = (unsigned char *)calloc(MAX_IMGBUF_SZ, sizeof(unsigned char));
+  if (segdata->blur_data == NULL) {
+    LOG_ERR("Failed to allocate blur_data");
+    goto out;
+  }
+  segdata->tmp_data = (unsigned char *)calloc(MAX_IMGBUF_SZ, sizeof(unsigned char));
+  if (segdata->tmp_data == NULL) {
+    LOG_ERR("Failed to allocate tmp_data");
+    goto out;
+  }
+  segdata->threshold_data = (bool *)calloc(MAX_IMGBUF_SZ, sizeof(bool));
+  if (segdata->threshold_data == NULL) {
+    LOG_ERR("Failed to allocate threshold_data");
+    goto out;
+  }
+  segdata->integral_data = (int *)calloc(MAX_IMGBUF_SZ, sizeof(int));
+  if (segdata->integral_data == NULL) {
+    LOG_ERR("Failed to allocate threshold_data");
+    goto out;
+  }
+
+  return segdata_reset(segdata, filename);
+
+out:
+  segdata_fini(segdata);
+  return -1;
+
+}
+
+void segdata_fini(segdata_t *segdata)
+{
+  if (segdata == NULL)
+    return;
+
+  if (segdata->img_data != NULL)
+    free(segdata->img_data);
+  if (segdata->hblur_data)
+    free(segdata->hblur_data);
+  if (segdata->blur_data)
+    free(segdata->blur_data);
+  if (segdata->tmp_data)
+    free(segdata->tmp_data);
+  if (segdata->threshold_data)
+    free(segdata->threshold_data);
+  if (segdata->integral_data)
+    free(segdata->integral_data);
+  bzero(segdata, sizeof(segdata_t));
+}
+
+int
+segdata_reset(segdata_t *segdata, char *filename)
+{
+  char *fname = NULL;
+  if (segdata == NULL || segdata->hblur_data == NULL ||
+      segdata->blur_data == NULL || segdata->threshold_data == NULL ||
+      segdata->tmp_data == NULL || segdata->integral_data == NULL) {
+    LOG_ERR("segdata not initialized!");
+    goto err;
+  }
+
+  if (segdata->img_data != NULL) {
+    free(segdata->img_data);
+    segdata->height = segdata->width = segdata->channels = 0;
+  }
+
+  LOG_DEBUG("Loading %s to memory", filename);
+  segdata->img_data = stbi_load(filename, &segdata->width,
+      &segdata->height, &segdata->channels, 1);
+  if (segdata->img_data == NULL) {
+    LOG_ERR("Failed to load the image to memory!");
+    goto err;
+  }
+  LOG_DEBUG("Image details(%s): w=%d, h=%d, n=%d",
+      filename, segdata->width, segdata->height, segdata->channels);
+
+  if (strcpy(segdata->filename, filename) == NULL) {
+    LOG_ERR("Failed to copy filename!");
+    goto err;
+  }
+
+  if (!debug_run)
+    return 0;
+
+  /*
+   * Reset debug fields.
+   */
+  // create debug folder
+  errno = 0;
+  if (mkdir(DEBUG_DIR, 0750) < 0 && errno != EEXIST) {
+    LOG_ERR("Failed to create the debug directory!");
+    goto err;
+  }
+
+  // get the file name from path
+  fname = strrchr(filename, '/');
+  if (fname != NULL)
+    fname++;
+  else
+    fname = filename;
+
+  if (sprintf(segdata->greyscale_filename, DEBUG_DIR"/gs_%s", fname) < 0) {
+    LOG_ERR("Failed to construct greyscale_filename!");
+    goto err;
+  }
+  stbi_write_jpg(segdata->greyscale_filename, segdata->width,
+      segdata->height, 1, segdata->img_data, 0);
+
+  if (sprintf(segdata->blur_filename, DEBUG_DIR"/blur_%s", fname) < 0) {
+    LOG_ERR("Failed to construct blur_filename!");
+    goto err;
+  }
+  if (sprintf(segdata->threshold_filename, DEBUG_DIR"/thresh_%s", fname) < 0) {
+    LOG_ERR("Failed to construct threshold_filename!");
+    goto err;
+  }
+
+  return 0;
+err:
+  segdata_fini(segdata);
+  return -1;
+}
+
+int
+greyscale_blur(unsigned char *data, int w, int h, int box_len,
+    unsigned char *hblur_data, unsigned char *blur_data)
 {
   int r;
   int i, j;
   int box_avg = 0;
-  unsigned char *hblur_data = NULL;
-  unsigned char *blur_data = NULL;
+
+  if (hblur_data == NULL || blur_data == NULL) {
+    LOG_ERR("Invalid hblur_data or blur_data");
+    return -1;
+  }
 
   if (box_len % 2 == 0) {
     LOG_ERR("Blur box length should be an odd number!");
-    return NULL;
+    return -1;
   }
   r = box_len / 2;
-
-  hblur_data = (unsigned char *) malloc(w * h);
-  if (hblur_data == NULL) {
-    LOG_ERR("Failed to malloc horizontal blur buffer!");
-    return NULL;
-  }
 
   // Horizontal blur
   for (i = 0; i < h; i++) {
@@ -67,12 +212,6 @@ greyscale_blur(unsigned char *data, int w, int h, int box_len)
 
       box_avg += (val / box_len);
     }
-  }
-
-  blur_data = (unsigned char *) malloc(w * h);
-  if (blur_data == NULL) {
-    LOG_ERR("Failed to malloc blur buffer!");
-    return NULL;
   }
 
   // Vertical Blur
@@ -108,8 +247,7 @@ greyscale_blur(unsigned char *data, int w, int h, int box_len)
     }
   }
 
-  free(hblur_data);
-  return blur_data;
+  return 0;
 }
 
 double
@@ -147,30 +285,24 @@ average_intensity(int *integrals, int x, int y, int w, int h, int winsz)
   return a / (double)(winsz * winsz);
 }
 
-bool *
-threshold(unsigned char *img_data, int w, int h, int x1, int y1, int x2, int y2)
+int
+threshold(unsigned char *img_data, int w, int h,
+    int x1, int y1, int x2, int y2,
+    int *integrals, bool *threshold)
 {
   int x, y;
   int i, j;
-  int *integrals = NULL;
-  bool *threshold = NULL;
+
+  if (integrals == NULL || threshold == NULL) {
+    LOG_ERR("Invalid integrals or threshold!");
+    return -1;
+  }
 
   x = x2 - x1;
   y = y2 - y1;
-  if (x < 0 || y < 0)
-    return NULL;
-
-  integrals = (int *)calloc(w * h, sizeof(int));
-  if (integrals == NULL) {
-    LOG_ERR("Failed to allocate integral array!");
-    return NULL;
-  }
-
-  threshold = (bool *) calloc(x * y, sizeof(bool));
-  if (threshold == NULL) {
-    LOG_ERR("Failed to allocate threshold array!");
-    free(integrals);
-    return NULL;
+  if (x < 0 || y < 0) {
+    LOG_ERR("Invalid coordinates for threshold!");
+    return -1;
   }
 
   for (i = 0; i < h; i++) {
@@ -190,6 +322,7 @@ threshold(unsigned char *img_data, int w, int h, int x1, int y1, int x2, int y2)
     }
   }
 
+  bzero(threshold, sizeof(bool) * w * h);
   for (i = x1; i < x2; i++) {
     for (j = y1; j < y2; j++) {
       unsigned char pixel = *(img_data + ((i * y) + j));
@@ -202,44 +335,41 @@ threshold(unsigned char *img_data, int w, int h, int x1, int y1, int x2, int y2)
     }
   }
 
-  free(integrals);
-  return threshold;
+  return 0;
 }
 
-int
-find_centroid(char *filename, worm_data_t *worm_data)
+int segdata_process(segdata_t *segdata)
 {
-  int w, h, n;
-  unsigned char *img_data = NULL;
-  unsigned char *blur_data = NULL;
-  bool *threshold_data = NULL;
+  int w, h;
   connected_component_t largest;
 
-  LOG_DEBUG("Segmenting %s", filename);
-  stbi_info(filename, &w, &h, &n);
-  if (stbi_failure_reason() != NULL) {
-    LOG_ERR("Failed to get information for image: %s\n", filename);
+  if (segdata == NULL) {
+    LOG_ERR("Inavlid segdata!");
     return -1;
   }
-  LOG_DEBUG("Image details(%s): w=%d, h=%d, n=%d",
-      filename, w, h, n);
+  w = segdata->width;
+  h = segdata->height;
+  LOG_DEBUG("Processing Image %s", segdata->filename);
+  if (greyscale_blur(segdata->img_data, w, h, 3,
+        segdata->hblur_data, segdata->blur_data) < 0) {
+    LOG_ERR("Failed to blur the image");
+    return -1;
+  }
+  if (debug_run) {
+    stbi_write_jpg(segdata->blur_filename, segdata->width,
+        segdata->height, 1, segdata->blur_data, 0);
+  }
 
-  img_data = stbi_load(filename, &w, &h, &n, 1);
-  if (img_data == NULL) {
-    LOG_ERR("Failed to load the image to memory!");
+  if (threshold(segdata->blur_data, w, h, 0, 0, h, w,
+        segdata->integral_data, segdata->threshold_data) < 0) {
+    LOG_ERR("hresholding failed!");
     return -1;
   }
-  stbi_write_png("output.png", w, h, 1, img_data, w);
-  blur_data = greyscale_blur(img_data, w, h, 3);
-  if (blur_data == NULL) {
-    LOG_ERR("blur failed!");
-    return -1;
+  if (debug_run) {
+    write_threshold(segdata->threshold_filename,
+        segdata->threshold_data, segdata->tmp_data, w, h);
   }
-  stbi_write_jpg("output_blur.jpg", w, h, 1, blur_data, 0);
-
-  threshold_data = threshold(blur_data, w, h, 0, 0, h, w);
-  write_threshold(threshold_data, w, h);
-  largest = largest_component(threshold_data, w, h);
+  largest = largest_component(segdata->threshold_data, w, h);
   printf("%d %d %d\n",
       largest.total_x / largest.count,
       largest.total_y / largest.count,
@@ -249,16 +379,10 @@ find_centroid(char *filename, worm_data_t *worm_data)
 }
 
 static int
-write_threshold(bool *threshold_data, int w, int h)
+write_threshold(char *filename, bool *threshold_data,
+    unsigned char *data, int w, int h)
 {
   int i, j;
-  unsigned char *data = NULL;
-
-  data = (unsigned char *)malloc(w * h);
-  if (data == NULL) {
-    LOG_ERR("Failed to allocate threshold write buffer!");
-    return -1;
-  }
 
   for (i = 0; i < h; i++) {
     for (j = 0; j < w; j++) {
@@ -269,8 +393,7 @@ write_threshold(bool *threshold_data, int w, int h)
       }
     }
   }
-  stbi_write_jpg("output_threshold.jpg", w, h, 1, data, 0);
+  stbi_write_jpg(filename, w, h, 1, data, 0);
 
-  free(data);
   return 0;
 }
