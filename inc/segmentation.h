@@ -29,9 +29,12 @@ typedef struct segdata_s {
   int width;
   int height;
   int channels;
+  int centroid_x;
+  int centroid_y;
+  int area;
 } segdata_t;
 
-int segdata_init(prog_args_t *args, char *filename, segdata_t *segdata);
+int segdata_init(segment_task_t *args, char *filename, segdata_t *segdata);
 int segdata_reset(segdata_t *segdata, char *filename);
 void segdata_fini(segdata_t *segdata);
 

@@ -1,34 +1,18 @@
 #pragma once
 
-#define NAME_MAX_LEN  128
+/*
+ * Alias segment_task_s since the contents 
+ * are same.
+ */
+typedef struct segment_task_s prog_args_t;
 
-typedef struct prog_args_s {
-  char project[NAME_MAX_LEN];
-  char input[NAME_MAX_LEN];
-  char ext[8];
-  char output[NAME_MAX_LEN];
-  char logfile[NAME_MAX_LEN];
-  int padding;
-  int frames;
-  int width;
-  int height;
-  int blur_radius;
-  int minarea;
-  int maxarea;
-  int srch_winsz;
-  int thresh_winsz;
-  float thresh_ratio;
-  loglevel_t verbosity;
-} prog_args_t;
-
-#define PROG_ARGS_DEFAULT_INPUT "data"
-#define PROG_ARGS_DEFAULT_OUTPUT "output.txt"
+#define PROG_ARGS_DEFAULT_INPUT_DIR "data"
+#define PROG_ARGS_DEFAULT_OUTPUT_DIR "out"
+#define PROG_ARGS_DEFAULT_OUTPUT_FILE "output.txt"
 #define PROG_ARGS_DEFAULT_EXT "jpg"
 #define PROG_ARGS_DEFAULT_LOGFILE "segmenter.log"
 #define PROG_ARGS_DEFAULT_PADDING 7
 #define PROG_ARGS_DEFAULT_FRAMES 1000
-#define PROG_ARGS_DEFAULT_WIDTH 640
-#define PROG_ARGS_DEFAULT_HEIGHT 480
 #define PROG_ARGS_DEFAULT_MINAREA 200
 #define PROG_ARGS_DEFAULT_MAXAREA 400
 #define PROG_ARGS_DEFAULT_SRCH_WINSZ 100

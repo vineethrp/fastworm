@@ -19,20 +19,19 @@ int parse_options(int key, char *arg, struct argp_state *state);
 
 struct argp_option options[] = {
   {"project",         'P', "NAME",       0,                    "The name of the project to process."},
-  {"input",           'i', "PATH",       0,  "Path to input images."},
-  {"output",          'o', "FILE PATH",  0,  "Output file path."},
+  {"input-dir",           'i', "PATH",       0,  "Path to input images."},
+  {"output-dir",          'o', "PATH",  0,  "Output file path."},
+  {"output-file",          'O', "FILE NAME",  0,  "Output file path."},
   {"padding",         'p', "NUMBER",     0,  "Number of digits in the file name."},
   {"frames",          'f', "FRAMES",     0,  "Number of frames to be processed."},
   {"extension",       'e', "STRING",     0,  "Extension of the image files."},
-  {"width",           'w', "WIDTH",      0,  "The horizontal resolution of the image."},
-  {"height",          'h', "HEIGHT",     0,  "The vertical resolution of the image."},
   {"minarea",         'a', "NUMBER",     0,  "The lower bound for a candidate worm component."},
   {"maxarea",        'A', "NUMBER",     0,  "The upper bound for a candidate worm component."},
   {"search_winsz", 's', "NUMBER",  0,  "Width and height of crop area."},
-  {"blur_radius",     'b', "NUMBER",  0,  "Width and height of the sliding window in the box blur."},
+  {"blur_winsz",     'b', "NUMBER",  0,  "Width and height of the sliding window in the box blur."},
   {"thresh_winsz", 't', "NUMBER",  0,  "Width and height of the sliding window in the dynamic threshold."},
   {"thresh_ratio",    'T', "FLOAT",      0,  "Pixel intensity."},
-  {"logfile",         'l', "FILE PATH",  0,  "Path to log file."},
+  {"logfile",         'l', "FILE NAME",  0,  "Path to log file."},
   {"verbose",         'v', 0, 0,  "Produce verbose output."},
   {"debug",           'd', 0, 0, "Enable creation of debug images"},
   { 0 }
@@ -71,25 +70,22 @@ parse_options(int key, char *arg, struct argp_state *state)
       strcpy(prog_args->project, arg);
       break;
     case 'i':
-      strcpy(prog_args->input, arg);
+      strcpy(prog_args->input_dir, arg);
       break;
     case 'o':
-      strcpy(prog_args->output, arg);
+      strcpy(prog_args->output_dir, arg);
+      break;
+    case 'O':
+      strcpy(prog_args->outfile, arg);
       break;
     case 'p':
       prog_args->padding = atoi(arg);
       break;
     case 'f':
-      prog_args->frames = atoi(arg);
+      prog_args->count = atoi(arg);
       break;
     case 'e':
       strcpy(prog_args->ext, arg);
-      break;
-    case 'w':
-      prog_args->width = atoi(arg);
-      break;
-    case 'h':
-      prog_args->height = atoi(arg);
       break;
     case 'a':
       prog_args->minarea = atoi(arg);
@@ -101,7 +97,7 @@ parse_options(int key, char *arg, struct argp_state *state)
       prog_args->srch_winsz = atoi(arg);
       break;
     case 'b':
-      prog_args->blur_radius = atoi(arg);
+      prog_args->blur_winsz = atoi(arg);
       break;
     case 't':
       prog_args->thresh_winsz = atoi(arg);
@@ -138,12 +134,16 @@ validate_options(prog_args_t *prog_args)
     return -1;
   }
 
-  if (prog_args->input[0] == 0) {
-    strcpy(prog_args->input, PROG_ARGS_DEFAULT_INPUT);
+  if (prog_args->input_dir[0] == 0) {
+    strcpy(prog_args->input_dir, PROG_ARGS_DEFAULT_INPUT_DIR);
   }
 
-  if (prog_args->output[0] == 0) {
-    strcpy(prog_args->output, PROG_ARGS_DEFAULT_OUTPUT);
+  if (prog_args->output_dir[0] == 0) {
+    strcpy(prog_args->output_dir, PROG_ARGS_DEFAULT_OUTPUT_DIR);
+  }
+
+  if (prog_args->outfile[0] == 0) {
+    strcpy(prog_args->outfile, PROG_ARGS_DEFAULT_OUTPUT_FILE);
   }
 
   if (prog_args->ext[0] == 0) {
@@ -158,16 +158,8 @@ validate_options(prog_args_t *prog_args)
     prog_args->padding = PROG_ARGS_DEFAULT_PADDING;
   }
 
-  if (prog_args->frames == 0) {
-    prog_args->frames = PROG_ARGS_DEFAULT_FRAMES;
-  }
-
-  if (prog_args->width == 0) {
-    prog_args->width = PROG_ARGS_DEFAULT_WIDTH;
-  }
-
-  if (prog_args->height == 0) {
-    prog_args->height = PROG_ARGS_DEFAULT_HEIGHT;
+  if (prog_args->count == 0) {
+    prog_args->count = PROG_ARGS_DEFAULT_FRAMES;
   }
 
   if (prog_args->minarea == 0) {
@@ -196,12 +188,14 @@ validate_options(prog_args_t *prog_args)
 
   if (prog_args->verbosity > LOG_INFO) {
     fprintf(stdout, "Program options:\n");
-    fprintf(stdout, "Project: %s, Input: %s, Output: %s\n",
-        prog_args->project, prog_args->input, prog_args->output);
-    fprintf(stdout, "padding: %d, frames: %d, width: %d, height: %d\n",
-        prog_args->padding, prog_args->frames, prog_args->width, prog_args->height);
-    fprintf(stdout, "minarea: %d, maxarea: %d\n",
-        prog_args->minarea, prog_args->maxarea);
+    fprintf(stdout, "Project: %s, Input dir: %s, Output dir: %s\n",
+        prog_args->project, prog_args->input_dir, prog_args->output_dir);
+    fprintf(stdout, "Output file: %s, log file: %s\n",
+        prog_args->outfile, prog_args->logfile);
+    fprintf(stdout, "padding: %d, frames: %d\n",
+        prog_args->padding, prog_args->count);
+    fprintf(stdout, "minarea: %d, maxarea: %d, blur_winsz: %d\n",
+        prog_args->minarea, prog_args->maxarea, prog_args->blur_winsz);
     fprintf(stdout, "srch_winsz: %d, thresh_winsz: %d, thresh_ratio: %f\n",
         prog_args->srch_winsz, prog_args->thresh_winsz, prog_args->thresh_ratio);
     fprintf(stdout, "verbosity: %d\n", prog_args->verbosity);

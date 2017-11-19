@@ -33,17 +33,17 @@ find_connected_component(bool *threshold_data,
 }
 
 connected_component_t
-largest_component(bool *threshold_data, int w, int h)
+largest_component(bool *threshold_data, int x1, int y1, int x2, int y2, int w, int h)
 {
   int i, j;
   connected_component_t largest_component = { 0 };
 
-  for (i = 0; i < h; i++) {
-    for (j = 0; j < w; j++) {
+  for (i = x1; i < x2; i++) {
+    for (j = y1; j < y2; j++) {
       if (*(threshold_data + (i * w) + j) == 1) {
         connected_component_t c = { 0 };
         find_connected_component(threshold_data, i, j, w, h, &c);
-        printf("Component: %d %d %d\n", c.total_x, c.total_y, c.count);
+        LOG_DEBUG("Component: %d %d %d", c.total_x, c.total_y, c.count);
         if (c.count > largest_component.count)
           largest_component = c;
       }

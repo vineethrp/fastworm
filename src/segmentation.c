@@ -18,13 +18,14 @@
 #include "largestcomponent.h"
 
 static int threshold_neighbor_sz = 25;
+static int srch_winsz = 100;
 static float threshold_ratio = 0.9;
 
 static int write_threshold(char *filename,
     bool *threshold_data, unsigned char *data, int w, int h);
 
 int
-segdata_init(prog_args_t *args, char *filename, segdata_t *segdata)
+segdata_init(segment_task_t *args, char *filename, segdata_t *segdata)
 {
 
   if (segdata == NULL) {
@@ -32,38 +33,44 @@ segdata_init(prog_args_t *args, char *filename, segdata_t *segdata)
     return -1;
   }
 
+  if (segdata->hblur_data || segdata->blur_data || segdata->threshold_data ||
+      segdata->tmp_data || segdata->integral_data) {
+    LOG_ERR("segdata buffers seems to be partially initialized!");
+    return -1;
+  }
+  bzero(segdata, sizeof(segdata_t));
   /*
    * Initialize all the buffers.
    */
   segdata->hblur_data = (unsigned char *)calloc(MAX_IMGBUF_SZ, sizeof(unsigned char));
   if (segdata->hblur_data == NULL) {
     LOG_ERR("Failed to allocate hblur_data");
-    goto out;
+    goto err;
   }
   segdata->blur_data = (unsigned char *)calloc(MAX_IMGBUF_SZ, sizeof(unsigned char));
   if (segdata->blur_data == NULL) {
     LOG_ERR("Failed to allocate blur_data");
-    goto out;
+    goto err;
   }
   segdata->tmp_data = (unsigned char *)calloc(MAX_IMGBUF_SZ, sizeof(unsigned char));
   if (segdata->tmp_data == NULL) {
     LOG_ERR("Failed to allocate tmp_data");
-    goto out;
+    goto err;
   }
   segdata->threshold_data = (bool *)calloc(MAX_IMGBUF_SZ, sizeof(bool));
   if (segdata->threshold_data == NULL) {
     LOG_ERR("Failed to allocate threshold_data");
-    goto out;
+    goto err;
   }
   segdata->integral_data = (int *)calloc(MAX_IMGBUF_SZ, sizeof(int));
   if (segdata->integral_data == NULL) {
     LOG_ERR("Failed to allocate threshold_data");
-    goto out;
+    goto err;
   }
 
   return segdata_reset(segdata, filename);
 
-out:
+err:
   segdata_fini(segdata);
   return -1;
 
@@ -305,6 +312,7 @@ threshold(unsigned char *img_data, int w, int h,
     return -1;
   }
 
+  bzero(integrals, sizeof(int) * w * h);
   for (i = 0; i < h; i++) {
     for (j = 0; j < w; j++) {
       // I(i, j) = F(i, j) + I(i - 1, j) + I (i, j - 1) - I(i - 1, j - 1)
@@ -325,12 +333,13 @@ threshold(unsigned char *img_data, int w, int h,
   bzero(threshold, sizeof(bool) * w * h);
   for (i = x1; i < x2; i++) {
     for (j = y1; j < y2; j++) {
-      unsigned char pixel = *(img_data + ((i * y) + j));
+      unsigned char pixel = *(img_data + ((i * w) + j));
       double avg = average_intensity(integrals, i, j, w, h, threshold_neighbor_sz);
       if ((pixel / avg) < threshold_ratio) {
-        *(threshold + ((i - x1) * y) + (j - y1)) = true;
+        //*(threshold + ((i - x1) * y) + (j - y1)) = true;
+        *(threshold + (i * w) + j) = true;
       } else {
-        *(threshold + ((i - x1) * y) + (j - y1)) = false;
+        *(threshold + (i * w) + j) = false;
       }
     }
   }
@@ -341,7 +350,9 @@ threshold(unsigned char *img_data, int w, int h,
 int segdata_process(segdata_t *segdata)
 {
   int w, h;
+  int x1, x2, y1, y2;
   connected_component_t largest;
+  int offset = srch_winsz / 2;
 
   if (segdata == NULL) {
     LOG_ERR("Inavlid segdata!");
@@ -360,19 +371,51 @@ int segdata_process(segdata_t *segdata)
         segdata->height, 1, segdata->blur_data, 0);
   }
 
-  if (threshold(segdata->blur_data, w, h, 0, 0, h, w,
+  if (segdata->centroid_x != 0 && segdata->centroid_y != 0) {
+    x1 = segdata->centroid_x - offset;
+    y1 = segdata->centroid_y - offset;
+    x2 = segdata->centroid_x + offset;
+    y2 = segdata->centroid_y + offset;
+    if (x1 < 0) x1 = 0;
+    if (y1 < 0) y1 = 0;
+    if (x2 > h) x2 = h;
+    if (y2 > w) y2 = w;
+  } else {
+    x1 = y1 = 0;
+    x2 = h, y2 = w;
+  }
+
+  if (threshold(segdata->blur_data, w, h, x1, y1, x2, y2,
         segdata->integral_data, segdata->threshold_data) < 0) {
-    LOG_ERR("hresholding failed!");
+    LOG_ERR("Thresholding failed!");
     return -1;
   }
   if (debug_run) {
     write_threshold(segdata->threshold_filename,
         segdata->threshold_data, segdata->tmp_data, w, h);
   }
-  largest = largest_component(segdata->threshold_data, w, h);
-  printf("%d %d %d\n",
-      largest.total_x / largest.count,
-      largest.total_y / largest.count,
+
+  largest = largest_component(segdata->threshold_data,
+      x1, y1, x2, y2, w, h);
+  if (largest.count <= 0) {
+    if (segdata->centroid_x > 0 && segdata->centroid_y > 0) {
+      /*
+       * cropped image parsing failed.
+       * Lets do full image.
+       */
+      LOG_WARN("Cropped Image threshold failed for %s\n", segdata->filename);
+      segdata->centroid_x = 0;
+      segdata->centroid_y = 0;
+      return segdata_process(segdata);
+    }
+    LOG_ERR("Thresholding failed for %s", segdata->filename);
+    return -1;
+  }
+
+  segdata->centroid_x = largest.total_x / largest.count;
+  segdata->centroid_y = largest.total_y / largest.count;
+  LOG_INFO("%d %d %d",
+      segdata->centroid_x, segdata->centroid_y      ,
       largest.count);
 
   return 0;
