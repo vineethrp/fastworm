@@ -191,66 +191,59 @@ greyscale_blur(unsigned char *data, int w, int h, int box_len,
   // Horizontal blur
   for (i = 0; i < h; i++) {
     int p; 
-    unsigned char val;
-    box_avg = 0;
+    unsigned char *hblur_data_row, *data_row;
+
+    data_row = data + (i * w);
     for (j = -r; j <= r; j++) {
       int k = (j < 0) ? 0 : j;
-      box_avg += *(data + (i * w) + k);
+      box_avg += data_row[k];
     }
     box_avg /= box_len;
 
+    hblur_data_row = hblur_data + (i * w);
     for (j = 0; j < w; j++) {
       box_avg = (box_avg > MAX_PIXEL_VALUE) ? MAX_PIXEL_VALUE : box_avg;
-      *(hblur_data + (i * w) + j) = box_avg;
+      hblur_data_row[j] = box_avg;
       
       p = j - r;
       if (p < 0)
-        val = *(data + (i * w) + 0);
-      else
-        val = *(data + (i * w) + p);
+        p = 0;
 
-      box_avg -= (val / box_len);
+      box_avg -= (data_row[p] / box_len);
 
       p = j + r + 1;
       if (p >= w)
-        val = *(data + (i * w) + (w - 1));
-      else
-        val = *(data + (i * w) + p);
+        p = w - 1;
 
-      box_avg += (val / box_len);
+      box_avg += (data_row[p] / box_len);
     }
   }
 
   // Vertical Blur
   for (i = 0; i < w; i++) {
     int p;
-    unsigned char val;
     box_avg = 0;
     for (j = -r; j <= r; j++) {
       int k = (j < 0) ? 0 : j;
-      box_avg += *(hblur_data + (k * w) + i);
+      box_avg += hblur_data[(k * w) + i];
     }
     box_avg /= box_len;
 
     for (j = 0; j < h; j++) {
       box_avg = (box_avg > MAX_PIXEL_VALUE) ? MAX_PIXEL_VALUE : box_avg;
-      *(blur_data + (j * w) + i) = box_avg;
+      blur_data[(j * w) + i] = box_avg;
 
       p = j - r;
       if (p < 0)
-        val = *(hblur_data + (0 * w) + i);
-      else
-        val = *(hblur_data + (p * w) + i);
+        p = 0;
 
-      box_avg -= val / box_len;
+      box_avg -= hblur_data[(p * w) + i] / box_len;
 
       p = j + r + 1;
       if (p >= h)
-        val = *(hblur_data + ((h - 1) * w) + i);
-      else
-        val = *(hblur_data + (p * w) + i);
+        p = h - 1;
 
-      box_avg += val / box_len;
+      box_avg += hblur_data[(p * w) + i] / box_len;
     }
   }
 
@@ -314,6 +307,8 @@ threshold(unsigned char *img_data, int w, int h,
 
   bzero(integrals, sizeof(int) * w * h);
   for (i = 0; i < h; i++) {
+    int *integrals_row = integrals + (i * w);
+    unsigned char *img_data_row = img_data + (i * w);
     for (j = 0; j < w; j++) {
       // I(i, j) = F(i, j) + I(i - 1, j) + I (i, j - 1) - I(i - 1, j - 1)
       int i1 = 0, i2 = 0, i3 = 0;
@@ -321,12 +316,12 @@ threshold(unsigned char *img_data, int w, int h,
         i1 = *(integrals + (((i - 1) * w) + j));
       }
       if (j != 0) {
-        i2 = *(integrals + ((i * w) + (j - 1)));
+        i2 = integrals_row[j - 1];
       }
       if (i != 0 && j != 0) {
         i3 = *(integrals + (((i - 1) * w) + (j - 1)));
       }
-      *(integrals + ((i * w) + j)) = *(img_data + ((i * w) + j)) + i1 + i2 - i3;
+      integrals_row[j] = img_data_row[j] + i1 + i2 - i3;
     }
   }
 
@@ -335,11 +330,10 @@ threshold(unsigned char *img_data, int w, int h,
     for (j = y1; j < y2; j++) {
       unsigned char pixel = *(img_data + ((i * w) + j));
       double avg = average_intensity(integrals, i, j, w, h, threshold_neighbor_sz);
+      bool *thresh_row = threshold + (i * w);
       if ((pixel / avg) < threshold_ratio) {
         //*(threshold + ((i - x1) * y) + (j - y1)) = true;
-        *(threshold + (i * w) + j) = true;
-      } else {
-        *(threshold + (i * w) + j) = false;
+        thresh_row[j] = true;
       }
     }
   }
@@ -366,6 +360,7 @@ int segdata_process(segdata_t *segdata)
     LOG_ERR("Failed to blur the image");
     return -1;
   }
+  LOG_DEBUG("greyscal_blur complete");
   if (debug_run) {
     stbi_write_jpg(segdata->blur_filename, segdata->width,
         segdata->height, 1, segdata->blur_data, 0);
@@ -390,6 +385,8 @@ int segdata_process(segdata_t *segdata)
     LOG_ERR("Thresholding failed!");
     return -1;
   }
+  LOG_DEBUG("Threshold complete");
+
   if (debug_run) {
     write_threshold(segdata->threshold_filename,
         segdata->threshold_data, segdata->tmp_data, w, h);
@@ -397,6 +394,7 @@ int segdata_process(segdata_t *segdata)
 
   largest = largest_component(segdata->threshold_data,
       x1, y1, x2, y2, w, h);
+  LOG_DEBUG("largestcomponent completed");
   if (largest.count <= 0) {
     if (segdata->centroid_x > 0 && segdata->centroid_y > 0) {
       /*
@@ -414,6 +412,7 @@ int segdata_process(segdata_t *segdata)
 
   segdata->centroid_x = largest.total_x / largest.count;
   segdata->centroid_y = largest.total_y / largest.count;
+  segdata->area = largest.count;
   LOG_INFO("%d %d %d",
       segdata->centroid_x, segdata->centroid_y      ,
       largest.count);

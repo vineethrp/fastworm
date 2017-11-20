@@ -26,6 +26,7 @@ static const char *loglevel_str[] = {
   "LOG_XX_DEBUG"
 };
 
+static loglevel_t desired_level = LOG_INFO;
 static unsigned long logbuf_sz = LOGBUF_SZ;
 static char *logbuf = NULL;
 static char *logbuf_ptr = NULL;
@@ -35,6 +36,9 @@ static bool log_rotated = false;
 int
 log_init(loglevel_t desired_loglevel, unsigned logbuf_size, const char *logfile)
 {
+  if (desired_loglevel > LOG_INFO)
+    desired_level = desired_loglevel;
+
 	if (logbuf_size != 0)
 		logbuf_sz = logbuf_size;
   logbuf = (char *) malloc(logbuf_sz);
@@ -92,6 +96,12 @@ log_write(loglevel_t loglevel, const char *format, ...)
 	char time_buf[TIME_STR_LEN];
   char buf[LOG_LINE_MAX];
   char *buf_ptr = buf;
+
+  if (logbuf == NULL)
+    return 0;
+
+  if (loglevel > desired_level)
+    return 0;
 
 	if (loglevel > LOG_XX_DEBUG)
 		loglevel = LOG_XX_DEBUG;
