@@ -9,12 +9,6 @@
 #define MAX_IMG_HEIGHT  2160
 #define MAX_IMGBUF_SZ  (MAX_IMG_WIDTH * MAX_IMG_HEIGHT)
 
-typedef struct worm_data_s {
-  float centroid_x;
-  float centroid_y;
-  float worm_area;
-} worm_data_t;
-
 typedef struct segdata_s {
   char filename[PATH_MAX];
   char greyscale_filename[PATH_MAX];

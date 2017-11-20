@@ -12,6 +12,7 @@
 bool debug_run = false;
 
 static int filepath(int padding, int num, char *prefix, char *ext, char *path);
+int write_output(char *filepath, report_t *reports, int count);
 int task_segmenter(segment_task_t *task);
 
 int
@@ -44,6 +45,12 @@ task_segmenter(segment_task_t *task)
   segdata_t segdata = { 0 };
   int last = task->start + task->count;
 
+  report_t *reports = (report_t *) calloc(task->count, sizeof(report_t));
+  if (reports == NULL) {
+    fprintf(stderr, "Failed to allocate reports\n");
+    return -1;
+  }
+
   for (i = task->start; i < last; i++) {
     ret = -1;
     if (filepath(task->padding, i, task->input_dir, task->ext, file_path) < 0) {
@@ -62,9 +69,15 @@ task_segmenter(segment_task_t *task)
       }
     }
     segdata_process(&segdata);
+    reports[i - task->start].frame_id = i;
+    reports[i - task->start].centroid_x = segdata.centroid_x;
+    reports[i - task->start].centroid_y = segdata.centroid_y;
+    reports[i - task->start].area = segdata.area;
     ret = 0;
   }
 
+  sprintf(file_path, "%s/%s", task->output_dir, task->outfile);
+  write_output(file_path, reports, task->count);
   segdata_fini(&segdata);
   return ret;
 }
@@ -84,5 +97,23 @@ filepath(int padding, int num, char *prefix, char *ext, char *path)
     return -1;
   }
 
+  return 0;
+}
+
+int
+write_output(char *filepath, report_t *reports, int count)
+{
+  int i;
+  FILE *f = fopen(filepath, "w");
+  if (f == NULL) {
+    fprintf(stderr, "Failed to open output file\n");
+    return -1;
+  }
+  for (i = 0; i < count; i++) {
+    fprintf(f, "%d, %d, %d, %d\n",
+        reports[i].frame_id, reports[i].centroid_y,
+        reports[i].centroid_x, reports[i].area);
+  }
+  fclose(f);
   return 0;
 }

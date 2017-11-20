@@ -8,6 +8,13 @@ extern bool debug_run;
 #define DEBUG_DIR "debug"
 #define EXT_MAX 8
 
+typedef struct report_s {
+  int frame_id;
+  int centroid_y;
+  int centroid_x;
+  int area;
+} report_t;
+
 typedef struct segment_task_s {
   /*
    * Task global data
@@ -32,5 +39,6 @@ typedef struct segment_task_s {
    */
   int start;
   int count;
+  report_t *reports;
 } segment_task_t;
 
