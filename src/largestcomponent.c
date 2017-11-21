@@ -20,17 +20,15 @@ find_connected_component(bool *threshold_data,
   c->total_y += y;
   c->count++;
 
-  if ((x - 1) >= 0 && *(threshold_data + ((x - 1) * w) + y))
-    find_connected_component(threshold_data, x - 1, y, w, h, c);
-
-  if ((x + 1) < h && *(threshold_data + ((x + 1) * w) + y))
-    find_connected_component(threshold_data, x + 1, y, w, h, c);
-
-  if ((y - 1) >= 0 && *(threshold_data + (x * w) + (y - 1)))
-    find_connected_component(threshold_data, x, y - 1, w, h, c);
-
-  if ((y + 1) < w && *(threshold_data + (x * w) + (y + 1)))
-    find_connected_component(threshold_data, x, y + 1, w, h, c);
+  for (int i = x - 1; i <= x + 1; i++) {
+    for (int j = y - 1; j <= y + 1; j++) {
+      if (i >= 0 && j >= 0 &&
+          i < h && j < w &&
+          *(threshold_data + (i * w) + j)) {
+        find_connected_component(threshold_data, i, j, w, h, c);
+      }
+    }
+  }
 
 }
 
