@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <unistd.h>
 #include <argp.h>
 
 #include "segmenter.h"
@@ -31,6 +32,7 @@ struct argp_option options[] = {
   {"blur_winsz",     'b', "NUMBER",  0,  "Width and height of the sliding window in the box blur."},
   {"thresh_winsz", 't', "NUMBER",  0,  "Width and height of the sliding window in the dynamic threshold."},
   {"thresh_ratio",    'T', "FLOAT",      0,  "Pixel intensity."},
+  {"jobs",           'j',  "NUMBER",   0, "Number of concurrent jobs(threads) to run locally"},
   {"logfile",         'l', "FILE NAME",  0,  "Path to log file."},
   {"verbose",         'v', 0, 0,  "Produce verbose output."},
   {"debug",           'd', 0, 0, "Enable creation of debug images"},
@@ -104,6 +106,9 @@ parse_options(int key, char *arg, struct argp_state *state)
       break;
     case 'T':
       prog_args->thresh_ratio = atof(arg);
+      break;
+    case 'j':
+      num_tasks = atoi(arg);
       break;
     case 'l':
       strcpy(prog_args->logfile, arg);
@@ -182,6 +187,11 @@ validate_options(prog_args_t *prog_args)
     prog_args->thresh_ratio = PROG_ARGS_DEFAULT_THRESH_RATIO;
   }
 
+  if (num_tasks == 0)
+    num_tasks = sysconf(_SC_NPROCESSORS_ONLN);
+  if (num_tasks > THREADS_MAX)
+    num_tasks = THREADS_MAX;
+
   if (prog_args < LOG_ERR) {
     prog_args->verbosity = LOG_INFO;
   }
@@ -198,6 +208,7 @@ validate_options(prog_args_t *prog_args)
         prog_args->minarea, prog_args->maxarea, prog_args->blur_winsz);
     fprintf(stdout, "srch_winsz: %d, thresh_winsz: %d, thresh_ratio: %f\n",
         prog_args->srch_winsz, prog_args->thresh_winsz, prog_args->thresh_ratio);
+    fprintf(stdout, "num_tasks: %ld\n", num_tasks);
     fprintf(stdout, "verbosity: %d\n", prog_args->verbosity);
   }
 

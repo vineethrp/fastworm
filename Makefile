@@ -13,7 +13,7 @@ CC=gcc
 ifeq ($(DEBUG), 1)
 	CFLAGS += -O0 -g
 else
-  CFLAGS += -O2
+  CFLAGS += -Ofast
 endif
 CFLAGS += -std=gnu99
 CFLAGS += -Wall -Werror

@@ -3,10 +3,13 @@
 
 #define SEGMENTER_VERSION_STR "segmenter 0.1.0"
 
+#define EXT_MAX 8
 
 extern bool debug_run;
 #define DEBUG_DIR "debug"
-#define EXT_MAX 8
+
+extern long num_tasks;
+#define THREADS_MAX 128
 
 typedef struct report_s {
   int frame_id;
