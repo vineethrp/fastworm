@@ -10,12 +10,16 @@ BIN_DIR = $(BLD_DIR)/bin
 SEGMENTER = $(BIN_DIR)/segmenter
 
 CC=gcc
-CFLAGS += -g -O0
+ifeq ($(DEBUG), 1)
+	CFLAGS += -O0 -g
+else
+  CFLAGS += -O2
+endif
 CFLAGS += -std=gnu99
 CFLAGS += -Wall -Werror
 CFLAGS += -I$(INC_DIR)
 
-LDLIBS = -lm
+LDLIBS = -lm -lpthread
 
 SEGMENTER_OBJS = 										\
 								 largestcomponent.o	\
