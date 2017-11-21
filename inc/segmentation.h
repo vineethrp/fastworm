@@ -14,7 +14,6 @@ typedef struct segdata_s {
   char greyscale_filename[PATH_MAX];
   char blur_filename[PATH_MAX];
   char threshold_filename[PATH_MAX];
-  unsigned char *hblur_data;
   unsigned char *blur_data;
   bool *threshold_data;
   unsigned char *tmp_data;

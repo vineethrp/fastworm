@@ -27,36 +27,36 @@ static int write_threshold(char *filename,
 int
 segdata_init(segment_task_t *args, char *filename, segdata_t *segdata)
 {
+  size_t imgbuf_sz;
+  unsigned char *imgbuf;
 
   if (segdata == NULL) {
     LOG_ERR("segdata_init: Invalid argument passed!");
     return -1;
   }
 
-  if (segdata->hblur_data || segdata->blur_data || segdata->threshold_data ||
+  if (segdata->blur_data || segdata->threshold_data ||
       segdata->tmp_data || segdata->integral_data) {
     LOG_ERR("segdata buffers seems to be partially initialized!");
     return -1;
   }
   bzero(segdata, sizeof(segdata_t));
+
+  if (segdata_reset(segdata, filename) < 0)
+    goto err;
+
   /*
    * Initialize all the buffers.
    */
-  segdata->hblur_data = (unsigned char *)calloc(MAX_IMGBUF_SZ, sizeof(unsigned char));
-  if (segdata->hblur_data == NULL) {
-    LOG_ERR("Failed to allocate hblur_data");
+  imgbuf_sz = segdata->width * segdata->height;
+  imgbuf = (unsigned char *) calloc(2 * imgbuf_sz, sizeof(unsigned char));
+  if (imgbuf == NULL) {
+    LOG_ERR("Failed to allocate Image buffer data");
     goto err;
   }
-  segdata->blur_data = (unsigned char *)calloc(MAX_IMGBUF_SZ, sizeof(unsigned char));
-  if (segdata->blur_data == NULL) {
-    LOG_ERR("Failed to allocate blur_data");
-    goto err;
-  }
-  segdata->tmp_data = (unsigned char *)calloc(MAX_IMGBUF_SZ, sizeof(unsigned char));
-  if (segdata->tmp_data == NULL) {
-    LOG_ERR("Failed to allocate tmp_data");
-    goto err;
-  }
+  segdata->blur_data = imgbuf;
+  segdata->tmp_data = imgbuf + imgbuf_sz;
+
   segdata->threshold_data = (bool *)calloc(MAX_IMGBUF_SZ, sizeof(bool));
   if (segdata->threshold_data == NULL) {
     LOG_ERR("Failed to allocate threshold_data");
@@ -68,7 +68,7 @@ segdata_init(segment_task_t *args, char *filename, segdata_t *segdata)
     goto err;
   }
 
-  return segdata_reset(segdata, filename);
+  return 0;
 
 err:
   segdata_fini(segdata);
@@ -81,14 +81,10 @@ void segdata_fini(segdata_t *segdata)
   if (segdata == NULL)
     return;
 
-  if (segdata->img_data != NULL)
+  if (segdata->img_data)
     free(segdata->img_data);
-  if (segdata->hblur_data)
-    free(segdata->hblur_data);
   if (segdata->blur_data)
     free(segdata->blur_data);
-  if (segdata->tmp_data)
-    free(segdata->tmp_data);
   if (segdata->threshold_data)
     free(segdata->threshold_data);
   if (segdata->integral_data)
@@ -100,12 +96,6 @@ int
 segdata_reset(segdata_t *segdata, char *filename)
 {
   char *fname = NULL;
-  if (segdata == NULL || segdata->hblur_data == NULL ||
-      segdata->blur_data == NULL || segdata->threshold_data == NULL ||
-      segdata->tmp_data == NULL || segdata->integral_data == NULL) {
-    LOG_ERR("segdata not initialized!");
-    goto err;
-  }
 
   if (segdata->img_data != NULL) {
     free(segdata->img_data);
@@ -126,6 +116,7 @@ segdata_reset(segdata_t *segdata, char *filename)
     LOG_ERR("Failed to copy filename!");
     goto err;
   }
+
 
   if (!debug_run)
     return 0;
@@ -356,7 +347,7 @@ int segdata_process(segdata_t *segdata)
   h = segdata->height;
   LOG_DEBUG("Processing Image %s", segdata->filename);
   if (greyscale_blur(segdata->img_data, w, h, 3,
-        segdata->hblur_data, segdata->blur_data) < 0) {
+        segdata->tmp_data, segdata->blur_data) < 0) {
     LOG_ERR("Failed to blur the image");
     return -1;
   }
