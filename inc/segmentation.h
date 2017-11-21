@@ -19,6 +19,7 @@ typedef struct segdata_s {
   unsigned char *tmp_data;
   int *integral_data;
   unsigned char *img_data;
+  bool debug_imgs;
   int width;
   int height;
   int channels;

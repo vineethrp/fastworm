@@ -41,6 +41,7 @@ segdata_init(segment_task_t *args, char *filename, segdata_t *segdata)
     return -1;
   }
   bzero(segdata, sizeof(segdata_t));
+  segdata->debug_imgs = args->debug_imgs;
 
   if (segdata_reset(segdata, filename) < 0)
     goto err;
@@ -118,7 +119,7 @@ segdata_reset(segdata_t *segdata, char *filename)
   }
 
 
-  if (!debug_run)
+  if (!segdata->debug_imgs)
     return 0;
 
   /*
@@ -352,7 +353,7 @@ int segdata_process(segdata_t *segdata)
     return -1;
   }
   LOG_DEBUG("greyscal_blur complete");
-  if (debug_run) {
+  if (segdata->debug_imgs) {
     stbi_write_jpg(segdata->blur_filename, segdata->width,
         segdata->height, 1, segdata->blur_data, 0);
   }
@@ -378,7 +379,7 @@ int segdata_process(segdata_t *segdata)
   }
   LOG_DEBUG("Threshold complete");
 
-  if (debug_run) {
+  if (segdata->debug_imgs) {
     write_threshold(segdata->threshold_filename,
         segdata->threshold_data, segdata->tmp_data, w, h);
   }

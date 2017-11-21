@@ -21,11 +21,15 @@ CFLAGS += -I$(INC_DIR)
 
 LDLIBS = -lm -lpthread
 
+MAIN_OBJS =					\
+						main.o	\
+
 SEGMENTER_OBJS = 										\
 								 argparser.o				\
 								 largestcomponent.o	\
 								 log.o 							\
 								 main.o							\
+								 segmenter.o				\
 								 segmentation.o
 
 .PHONY: all
@@ -39,7 +43,7 @@ $(OBJ_DIR)/%.o : $(SRC_DIR)/%.c | $(OBJ_DIR) $(DEPS_DIR)
 $(OBJ_DIR) $(DEPS_DIR) $(BIN_DIR):
 		$(MKDIR) $@
 
-$(SEGMENTER): $(SEGMENTER_OBJS:%.o=$(OBJ_DIR)/%.o) | $(BIN_DIR)
+$(SEGMENTER): $(SEGMENTER_OBJS:%.o=$(OBJ_DIR)/%.o) $(MAIN_OBJS:%.o=$(OBJ_DIR)/%.o) | $(BIN_DIR)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 .PHONY: clean

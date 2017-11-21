@@ -5,10 +5,8 @@
 
 #define EXT_MAX 8
 
-extern bool debug_run;
 #define DEBUG_DIR "debug"
 
-extern long num_tasks;
 #define THREADS_MAX 128
 
 typedef struct report_s {
@@ -35,13 +33,19 @@ typedef struct segment_task_s {
   int blur_winsz;
   int thresh_winsz;
   float thresh_ratio;
+  bool debug_imgs;
+  int num_tasks;
   int verbosity;
 
   /*
    * per task data
    */
-  int start;
-  int count;
+  int base;   // Starting frame for this process.
+  int start;  // Starting frame for this thread
+  int count;  // Number of frames to process for this thread
   report_t *reports;
 } segment_task_t;
 
+int write_output(char *filepath, report_t *reports, int count);
+void *task_segmenter(void *data);
+int dispatch_segmenter_tasks(segment_task_t *task);

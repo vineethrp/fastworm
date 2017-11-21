@@ -108,7 +108,7 @@ parse_options(int key, char *arg, struct argp_state *state)
       prog_args->thresh_ratio = atof(arg);
       break;
     case 'j':
-      num_tasks = atoi(arg);
+      prog_args->num_tasks = atoi(arg);
       break;
     case 'l':
       strcpy(prog_args->logfile, arg);
@@ -117,7 +117,7 @@ parse_options(int key, char *arg, struct argp_state *state)
       prog_args->verbosity++;
       break;
     case 'd':
-      debug_run = true;
+      prog_args->debug_imgs = true;
       break;
     default:
       return ARGP_ERR_UNKNOWN;
@@ -187,10 +187,10 @@ validate_options(prog_args_t *prog_args)
     prog_args->thresh_ratio = PROG_ARGS_DEFAULT_THRESH_RATIO;
   }
 
-  if (num_tasks == 0)
-    num_tasks = sysconf(_SC_NPROCESSORS_ONLN);
-  if (num_tasks > THREADS_MAX)
-    num_tasks = THREADS_MAX;
+  if (prog_args->num_tasks == 0)
+    prog_args->num_tasks = sysconf(_SC_NPROCESSORS_ONLN);
+  if (prog_args->num_tasks > THREADS_MAX)
+    prog_args->num_tasks = THREADS_MAX;
 
   if (prog_args < LOG_ERR) {
     prog_args->verbosity = LOG_INFO;
@@ -208,8 +208,9 @@ validate_options(prog_args_t *prog_args)
         prog_args->minarea, prog_args->maxarea, prog_args->blur_winsz);
     fprintf(stdout, "srch_winsz: %d, thresh_winsz: %d, thresh_ratio: %f\n",
         prog_args->srch_winsz, prog_args->thresh_winsz, prog_args->thresh_ratio);
-    fprintf(stdout, "num_tasks: %ld\n", num_tasks);
-    fprintf(stdout, "verbosity: %d\n", prog_args->verbosity);
+    fprintf(stdout, "num_tasks: %d\n", prog_args->num_tasks);
+    fprintf(stdout, "debug_imgs: %d, verbosity: %d\n",
+        prog_args->debug_imgs, prog_args->verbosity);
   }
 
   return 0;
