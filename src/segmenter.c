@@ -16,25 +16,25 @@ int
 dispatch_segmenter_tasks(segment_task_t *task)
 {
   int i = 0;
-  pthread_t thrs[THREADS_MAX];
+  pthread_t thrs[TASKS_MAX];
   int frames_per_thread;
-  int spilled_tasks, prev_start, prev_count;
+  int spilled_tasks, prev_start, prev_nr_frames;
   segment_task_t main_task = { 0 };
-  segment_task_t thr_tasks[THREADS_MAX];
+  segment_task_t thr_tasks[TASKS_MAX];
 
-  if (task->count < task->num_tasks)
-    task->num_tasks = task->count;
+  if (task->nr_frames < task->nr_tasks)
+    task->nr_tasks = task->nr_frames;
 
-  frames_per_thread = task->count / task->num_tasks;
+  frames_per_thread = task->nr_frames / task->nr_tasks;
 
-  task->reports = (report_t *) calloc(task->count, sizeof(report_t));
+  task->reports = (report_t *) calloc(task->nr_frames, sizeof(report_t));
   if (task->reports == NULL) {
     LOG_ERR("Failed to allocate reports!");
     return -1;
   }
 
   /*
-   * start num_tasks - 1 threads (this main thread also does job!)
+   * start nr_tasks - 1 threads (this main thread also does job!)
    *
    * Work splitting is like this:
    * frame per thread = total frames / number of threads
@@ -45,19 +45,19 @@ dispatch_segmenter_tasks(segment_task_t *task)
    * This way, one thread is not overloaded with all the spilled over frames.
    */
   prev_start = task->base;
-  prev_count = frames_per_thread;
-  spilled_tasks = task->count % frames_per_thread;
-  for (i = 0; i < task->num_tasks - 1; i++) {
+  prev_nr_frames = frames_per_thread;
+  spilled_tasks = task->nr_frames % frames_per_thread;
+  for (i = 0; i < task->nr_tasks - 1; i++) {
     thr_tasks[i] = *task;
-    thr_tasks[i].start = prev_start + prev_count;
-    thr_tasks[i].count = frames_per_thread;
+    thr_tasks[i].start = prev_start + prev_nr_frames;
+    thr_tasks[i].nr_frames = frames_per_thread;
     if (spilled_tasks > 0) {
-      thr_tasks[i].count++;
+      thr_tasks[i].nr_frames++;
       spilled_tasks--;
     }
     prev_start = thr_tasks[i].start;
-    prev_count = thr_tasks[i].count;
-    LOG_XX_DEBUG("Thread %d: start=%d, count=%d", i, thr_tasks[i].start, thr_tasks[i].count);
+    prev_nr_frames = thr_tasks[i].nr_frames;
+    LOG_XX_DEBUG("Thread %d: start=%d, nr_frames=%d", i, thr_tasks[i].start, thr_tasks[i].nr_frames);
     if (pthread_create(&thrs[i], NULL, task_segmenter, (void *)&thr_tasks[i]) < 0) {
       LOG_ERR("Failed to create thread %d!", i);
       goto err;
@@ -68,15 +68,15 @@ dispatch_segmenter_tasks(segment_task_t *task)
    * Rest of the work in Main thread!
    */
   main_task = *task;
-  main_task.count = frames_per_thread;
+  main_task.nr_frames = frames_per_thread;
   main_task.start = task->base;
-  LOG_XX_DEBUG("Main Thread: start=%d, count=%d", main_task.start, main_task.count);
+  LOG_XX_DEBUG("Main Thread: start=%d, nr_frames=%d", main_task.start, main_task.nr_frames);
   task_segmenter(&main_task);
 
   /*
    * Wait for all worker threads!
    */
-  for (i = 0; i < task->num_tasks - 1; i++) {
+  for (i = 0; i < task->nr_tasks - 1; i++) {
     int *ret_val;
     pthread_join(thrs[i], (void *)&ret_val);
     if ((long long)ret_val != 0) {
@@ -101,7 +101,7 @@ task_segmenter(void *data)
   segdata_t segdata = { 0 };
 
   task = (segment_task_t *)data;
-  last = task->start + task->count;
+  last = task->start + task->nr_frames;
 
   for (i = task->start; i < last; i++) {
     int report_index = i - task->base;
@@ -152,7 +152,7 @@ filepath(int padding, int num, char *prefix, char *ext, char *path)
 }
 
 int
-write_output(char *filepath, report_t *reports, int count)
+write_output(char *filepath, report_t *reports, int nr_frames)
 {
   int i;
   FILE *f = fopen(filepath, "w");
@@ -160,7 +160,7 @@ write_output(char *filepath, report_t *reports, int count)
     fprintf(stderr, "Failed to open output file\n");
     return -1;
   }
-  for (i = 0; i < count; i++) {
+  for (i = 0; i < nr_frames; i++) {
     fprintf(f, "%d, %d, %d, %d\n",
         reports[i].frame_id, reports[i].centroid_y,
         reports[i].centroid_x, reports[i].area);

@@ -84,7 +84,7 @@ parse_options(int key, char *arg, struct argp_state *state)
       prog_args->padding = atoi(arg);
       break;
     case 'f':
-      prog_args->count = atoi(arg);
+      prog_args->nr_frames = atoi(arg);
       break;
     case 'e':
       strcpy(prog_args->ext, arg);
@@ -108,7 +108,7 @@ parse_options(int key, char *arg, struct argp_state *state)
       prog_args->thresh_ratio = atof(arg);
       break;
     case 'j':
-      prog_args->num_tasks = atoi(arg);
+      prog_args->nr_tasks = atoi(arg);
       break;
     case 'l':
       strcpy(prog_args->logfile, arg);
@@ -163,8 +163,8 @@ validate_options(prog_args_t *prog_args)
     prog_args->padding = PROG_ARGS_DEFAULT_PADDING;
   }
 
-  if (prog_args->count == 0) {
-    prog_args->count = PROG_ARGS_DEFAULT_FRAMES;
+  if (prog_args->nr_frames == 0) {
+    prog_args->nr_frames = PROG_ARGS_DEFAULT_FRAMES;
   }
 
   if (prog_args->minarea == 0) {
@@ -187,10 +187,10 @@ validate_options(prog_args_t *prog_args)
     prog_args->thresh_ratio = PROG_ARGS_DEFAULT_THRESH_RATIO;
   }
 
-  if (prog_args->num_tasks == 0)
-    prog_args->num_tasks = sysconf(_SC_NPROCESSORS_ONLN);
-  if (prog_args->num_tasks > THREADS_MAX)
-    prog_args->num_tasks = THREADS_MAX;
+  if (prog_args->nr_tasks == 0)
+    prog_args->nr_tasks = sysconf(_SC_NPROCESSORS_ONLN);
+  if (prog_args->nr_tasks > TASKS_MAX)
+    prog_args->nr_tasks = TASKS_MAX;
 
   if (prog_args < LOG_ERR) {
     prog_args->verbosity = LOG_INFO;
@@ -203,12 +203,12 @@ validate_options(prog_args_t *prog_args)
     fprintf(stdout, "Output file: %s, log file: %s\n",
         prog_args->outfile, prog_args->logfile);
     fprintf(stdout, "padding: %d, frames: %d\n",
-        prog_args->padding, prog_args->count);
+        prog_args->padding, prog_args->nr_frames);
     fprintf(stdout, "minarea: %d, maxarea: %d, blur_winsz: %d\n",
         prog_args->minarea, prog_args->maxarea, prog_args->blur_winsz);
     fprintf(stdout, "srch_winsz: %d, thresh_winsz: %d, thresh_ratio: %f\n",
         prog_args->srch_winsz, prog_args->thresh_winsz, prog_args->thresh_ratio);
-    fprintf(stdout, "num_tasks: %d\n", prog_args->num_tasks);
+    fprintf(stdout, "nr_tasks: %d\n", prog_args->nr_tasks);
     fprintf(stdout, "debug_imgs: %d, verbosity: %d\n",
         prog_args->debug_imgs, prog_args->verbosity);
   }

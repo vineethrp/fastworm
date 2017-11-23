@@ -7,7 +7,7 @@
 
 #define DEBUG_DIR "debug"
 
-#define THREADS_MAX 128
+#define TASKS_MAX 128
 
 typedef struct report_s {
   int frame_id;
@@ -34,15 +34,15 @@ typedef struct segment_task_s {
   int thresh_winsz;
   float thresh_ratio;
   bool debug_imgs;
-  int num_tasks;
+  int nr_tasks;
   int verbosity;
 
   /*
    * per task data
    */
-  int base;   // Starting frame for this process.
-  int start;  // Starting frame for this thread
-  int count;  // Number of frames to process for this thread
+  int base;       // Starting frame for this process.
+  int start;      // Starting frame for this thread
+  int nr_frames;  // Number of frames to process for this thread
   report_t *reports;
 } segment_task_t;
 
