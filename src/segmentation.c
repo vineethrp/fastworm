@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -16,6 +17,7 @@
 #include "argparser.h"
 #include "segmentation.h"
 #include "largestcomponent.h"
+#include "profile.h"
 
 static int threshold_neighbor_sz = 25;
 static int srch_winsz = 100;
@@ -23,6 +25,15 @@ static float threshold_ratio = 0.9;
 
 static int write_threshold(char *filename,
     bool *threshold_data, unsigned char *data, int w, int h);
+
+int
+simple_threshold(unsigned char *img_data, int w, int h,
+    int x1, int y1, int x2, int y2,
+    int *integrals, bool *threshold);
+int
+dynamic_threshold(unsigned char *img_data, int w, int h,
+    int x1, int y1, int x2, int y2,
+    int *integrals, bool *threshold);
 
 int
 segdata_init(segment_task_t *args, char *filename, segdata_t *segdata)
@@ -68,6 +79,11 @@ segdata_init(segment_task_t *args, char *filename, segdata_t *segdata)
     LOG_ERR("Failed to allocate threshold_data");
     goto err;
   }
+
+  if (args->dynamic_threshold)
+    segdata->thresh_fn = dynamic_threshold;
+  else
+    segdata->thresh_fn = simple_threshold;
 
   return 0;
 
@@ -162,7 +178,8 @@ err:
 }
 
 int
-greyscale_blur(unsigned char *data, int w, int h, int box_len,
+greyscale_blur(unsigned char *data, int w, int h,
+    int x1, int y1, int x2, int y2, int box_len,
     unsigned char *hblur_data, unsigned char *blur_data)
 {
   int r;
@@ -181,61 +198,58 @@ greyscale_blur(unsigned char *data, int w, int h, int box_len,
   r = box_len / 2;
 
   // Horizontal blur
-  for (i = 0; i < h; i++) {
+  for (i = x1; i < x2; i++) {
     int p; 
-    unsigned char *hblur_data_row, *data_row;
 
-    data_row = data + (i * w);
-    for (j = -r; j <= r; j++) {
+    for (j = y1-r; j <= y1+r; j++) {
       int k = (j < 0) ? 0 : j;
-      box_avg += data_row[k];
+      box_avg += *(data + (i * w) + k);
     }
     box_avg /= box_len;
 
-    hblur_data_row = hblur_data + (i * w);
-    for (j = 0; j < w; j++) {
+    for (j = y1; j < y2; j++) {
       box_avg = (box_avg > MAX_PIXEL_VALUE) ? MAX_PIXEL_VALUE : box_avg;
-      hblur_data_row[j] = box_avg;
+      *(hblur_data + (i * w) + j) = box_avg;
       
       p = j - r;
       if (p < 0)
         p = 0;
 
-      box_avg -= (data_row[p] / box_len);
+      box_avg -= (*(data + (i * w) + p) / box_len);
 
       p = j + r + 1;
       if (p >= w)
         p = w - 1;
 
-      box_avg += (data_row[p] / box_len);
+      box_avg += (*(data + (i * w) + p) / box_len);
     }
   }
 
   // Vertical Blur
-  for (i = 0; i < w; i++) {
+  for (i = y1; i < y2; i++) {
     int p;
     box_avg = 0;
-    for (j = -r; j <= r; j++) {
+    for (j = x1-r; j <= x1+r; j++) {
       int k = (j < 0) ? 0 : j;
-      box_avg += hblur_data[(k * w) + i];
+      box_avg += *(hblur_data + (k * w) + i);
     }
     box_avg /= box_len;
 
-    for (j = 0; j < h; j++) {
+    for (j = x1; j < x2; j++) {
       box_avg = (box_avg > MAX_PIXEL_VALUE) ? MAX_PIXEL_VALUE : box_avg;
-      blur_data[(j * w) + i] = box_avg;
+      *(blur_data + (j * w) + i) = box_avg;
 
       p = j - r;
       if (p < 0)
         p = 0;
 
-      box_avg -= hblur_data[(p * w) + i] / box_len;
+      box_avg -= *(hblur_data + (p * w) + i) / box_len;
 
       p = j + r + 1;
       if (p >= h)
         p = h - 1;
 
-      box_avg += hblur_data[(p * w) + i] / box_len;
+      box_avg += *(hblur_data + (p * w) + i) / box_len;
     }
   }
 
@@ -278,7 +292,23 @@ average_intensity(int *integrals, int x, int y, int w, int h, int winsz)
 }
 
 int
-threshold(unsigned char *img_data, int w, int h,
+simple_threshold(unsigned char *img_data, int w, int h,
+    int x1, int y1, int x2, int y2,
+    int *integrals, bool *threshold)
+{
+  int threshold_pixel = 254 * threshold_ratio;
+
+  for (int i = x1; i < x2; i++) {
+    for (int j = y1; j < y2; j++) {
+      if (*(img_data + (i * w) + j) < threshold_pixel)
+        *(threshold + (i * w) + j) = true;
+    }
+  }
+  return 0;
+}
+
+int
+dynamic_threshold(unsigned char *img_data, int w, int h,
     int x1, int y1, int x2, int y2,
     int *integrals, bool *threshold)
 {
@@ -299,8 +329,6 @@ threshold(unsigned char *img_data, int w, int h,
 
   bzero(integrals, sizeof(int) * w * h);
   for (i = 0; i < h; i++) {
-    int *integrals_row = integrals + (i * w);
-    unsigned char *img_data_row = img_data + (i * w);
     for (j = 0; j < w; j++) {
       // I(i, j) = F(i, j) + I(i - 1, j) + I (i, j - 1) - I(i - 1, j - 1)
       int i1 = 0, i2 = 0, i3 = 0;
@@ -308,12 +336,12 @@ threshold(unsigned char *img_data, int w, int h,
         i1 = *(integrals + (((i - 1) * w) + j));
       }
       if (j != 0) {
-        i2 = integrals_row[j - 1];
+        i2 = *(integrals + (i * w) + (j - 1));
       }
       if (i != 0 && j != 0) {
         i3 = *(integrals + (((i - 1) * w) + (j - 1)));
       }
-      integrals_row[j] = img_data_row[j] + i1 + i2 - i3;
+      *(integrals + (i * w) + j) = *(img_data + (i * w) +j) + i1 + i2 - i3;
     }
   }
 
@@ -322,10 +350,9 @@ threshold(unsigned char *img_data, int w, int h,
     for (j = y1; j < y2; j++) {
       unsigned char pixel = *(img_data + ((i * w) + j));
       double avg = average_intensity(integrals, i, j, w, h, threshold_neighbor_sz);
-      bool *thresh_row = threshold + (i * w);
       if ((pixel / avg) < threshold_ratio) {
         //*(threshold + ((i - x1) * y) + (j - y1)) = true;
-        thresh_row[j] = true;
+        *(threshold + (i * w) + j) = true;
       }
     }
   }
@@ -347,16 +374,6 @@ int segdata_process(segdata_t *segdata)
   w = segdata->width;
   h = segdata->height;
   LOG_DEBUG("Processing Image %s", segdata->filename);
-  if (greyscale_blur(segdata->img_data, w, h, 3,
-        segdata->tmp_data, segdata->blur_data) < 0) {
-    LOG_ERR("Failed to blur the image");
-    return -1;
-  }
-  LOG_DEBUG("greyscal_blur complete");
-  if (segdata->debug_imgs) {
-    stbi_write_jpg(segdata->blur_filename, segdata->width,
-        segdata->height, 1, segdata->blur_data, 0);
-  }
 
   if (segdata->centroid_x != 0 && segdata->centroid_y != 0) {
     x1 = segdata->centroid_x - offset;
@@ -372,7 +389,19 @@ int segdata_process(segdata_t *segdata)
     x2 = h, y2 = w;
   }
 
-  if (threshold(segdata->blur_data, w, h, x1, y1, x2, y2,
+  if (greyscale_blur(segdata->img_data, w, h, x1, y1, x2, y2, 3,
+        segdata->tmp_data, segdata->blur_data) < 0) {
+    LOG_ERR("Failed to blur the image");
+    return -1;
+  }
+  LOG_DEBUG("greyscal_blur complete");
+
+  if (segdata->debug_imgs) {
+    stbi_write_jpg(segdata->blur_filename, segdata->width,
+        segdata->height, 1, segdata->blur_data, 0);
+  }
+
+  if (segdata->thresh_fn(segdata->blur_data, w, h, x1, y1, x2, y2,
         segdata->integral_data, segdata->threshold_data) < 0) {
     LOG_ERR("Thresholding failed!");
     return -1;
@@ -387,6 +416,7 @@ int segdata_process(segdata_t *segdata)
   largest = largest_component(segdata->threshold_data,
       x1, y1, x2, y2, w, h);
   LOG_DEBUG("largestcomponent completed");
+
   if (largest.count <= 0) {
     if (segdata->centroid_x > 0 && segdata->centroid_y > 0) {
       /*

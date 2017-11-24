@@ -9,6 +9,8 @@
 #define MAX_IMG_HEIGHT  2160
 #define MAX_IMGBUF_SZ  (MAX_IMG_WIDTH * MAX_IMG_HEIGHT)
 
+typedef int (*threshold_fn_t)(unsigned char*, int, int, int, int, int, int, int*, bool*);
+
 typedef struct segdata_s {
   char filename[PATH_MAX];
   char greyscale_filename[PATH_MAX];
@@ -20,6 +22,7 @@ typedef struct segdata_s {
   int *integral_data;
   unsigned char *img_data;
   bool debug_imgs;
+  threshold_fn_t thresh_fn;
   int width;
   int height;
   int channels;

@@ -34,6 +34,7 @@ typedef struct segment_task_s {
   int thresh_winsz;
   float thresh_ratio;
   bool debug_imgs;
+  bool dynamic_threshold;
   int nr_tasks;
   int verbosity;
 

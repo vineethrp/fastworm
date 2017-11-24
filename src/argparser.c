@@ -36,6 +36,7 @@ struct argp_option options[] = {
   {"logfile",         'l', "FILE NAME",  0,  "Path to log file."},
   {"verbose",         'v', 0, 0,  "Produce verbose output."},
   {"debug",           'd', 0, 0, "Enable creation of debug images"},
+  {"dynamic_threshold", 'D', 0, 0, "Use dynamic thresholding algorithm"},
   { 0 }
 };
 
@@ -113,6 +114,8 @@ parse_options(int key, char *arg, struct argp_state *state)
     case 'l':
       strcpy(prog_args->logfile, arg);
       break;
+    case 'D':
+      prog_args->dynamic_threshold = true;
     case 'v':
       prog_args->verbosity++;
       break;

@@ -43,6 +43,7 @@ SEGMENTER_OBJS =                    \
                  argparser.o        \
                  largestcomponent.o \
                  log.o              \
+								 profile.o          \
                  segmenter.o        \
                  segmentation.o
 
