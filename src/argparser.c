@@ -178,6 +178,10 @@ validate_options(prog_args_t *prog_args)
     prog_args->maxarea = PROG_ARGS_DEFAULT_MAXAREA;
   }
 
+  if (prog_args->blur_winsz == 0) {
+    prog_args->blur_winsz = PROG_ARGS_DEFAULT_BLUR_WINSZ;
+  }
+
   if (prog_args->srch_winsz == 0) {
     prog_args->srch_winsz = PROG_ARGS_DEFAULT_SRCH_WINSZ;
   }

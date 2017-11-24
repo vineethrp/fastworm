@@ -1,38 +1,25 @@
 #pragma once
 
-#include <stdbool.h>
-#include <limits.h>
-
 #define MAX_PIXEL_VALUE 255
 
-#define MAX_IMG_WIDTH 3840
-#define MAX_IMG_HEIGHT  2160
-#define MAX_IMGBUF_SZ  (MAX_IMG_WIDTH * MAX_IMG_HEIGHT)
+int
+greyscale_blur(unsigned char *data, int w, int h,
+    int x1, int y1, int x2, int y2, int box_len,
+    unsigned char *hblur_data, unsigned char *blur_data);
 
-typedef int (*threshold_fn_t)(unsigned char*, int, int, int, int, int, int, int*, bool*);
+typedef int (*threshold_fn_t)(unsigned char*, int, int,
+    int, int, int, int,
+    int, float,
+    int*, bool*);
 
-typedef struct segdata_s {
-  char filename[PATH_MAX];
-  char greyscale_filename[PATH_MAX];
-  char blur_filename[PATH_MAX];
-  char threshold_filename[PATH_MAX];
-  unsigned char *blur_data;
-  bool *threshold_data;
-  unsigned char *tmp_data;
-  int *integral_data;
-  unsigned char *img_data;
-  bool debug_imgs;
-  threshold_fn_t thresh_fn;
-  int width;
-  int height;
-  int channels;
-  int centroid_x;
-  int centroid_y;
-  int area;
-} segdata_t;
+int
+simple_threshold(unsigned char *img_data, int w, int h,
+    int x1, int y1, int x2, int y2,
+    int threshold_winsz, float threshold_ratio,
+    int *integrals, bool *threshold);
+int
+dynamic_threshold(unsigned char *img_data, int w, int h,
+    int x1, int y1, int x2, int y2,
+    int threshold_winsz, float threshold_ratio,
+    int *integrals, bool *threshold);
 
-int segdata_init(segment_task_t *args, char *filename, segdata_t *segdata);
-int segdata_reset(segdata_t *segdata, char *filename);
-void segdata_fini(segdata_t *segdata);
-
-int segdata_process(segdata_t *segdata);
