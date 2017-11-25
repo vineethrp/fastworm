@@ -87,6 +87,45 @@ greyscale_blur(unsigned char *data, int w, int h,
   return 0;
 }
 
+static inline int
+box_sum(unsigned char *data, int w, int h,
+    int x, int y)
+{
+  int sum = 0;
+  for (int i = x - 1; i <= x + 1; i++) {
+    for (int j = y - 1; j <= y + 1; j++) {
+      int x1 = i, y1 = j;
+      if (x1 < 0) x1 = 0;
+      if (x1 >= h) x1 = h - 1;
+      if (y1 < 0) y1 = 0;
+      if (y1 >= w) y1 = w - 1;
+      sum += *(data + (x1 * w) + y1);
+    }
+  }
+
+  return sum;
+}
+
+int
+greyscale_simple_blur(unsigned char *data, int w, int h,
+    int x1, int y1, int x2, int y2, int box_len,
+    unsigned char *hblur_data, unsigned char *blur_data)
+{
+  if (box_len > 3)
+    greyscale_blur(data, w, h, x1, y1, x2, y2, box_len,
+        hblur_data, blur_data);
+
+  for (int i = x1; i < x2; i++) {
+    for (int j = y1; j < y2; j++) {
+      int avg = box_sum(data, w, h, i, j) / 9;
+      if (avg > MAX_PIXEL_VALUE) avg = MAX_PIXEL_VALUE;
+      *(blur_data + (i * w) + j) = avg;
+    }
+  }
+
+  return 0;
+}
+
 static double
 average_intensity(int *integrals, int x, int y, int w, int h, int winsz)
 {

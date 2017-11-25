@@ -335,7 +335,7 @@ int segdata_process(segdata_t *segdata)
   }
 
   START_PROFILE
-  if (greyscale_blur(segdata->img_data, w, h, x1, y1, x2, y2,
+  if (greyscale_simple_blur(segdata->img_data, w, h, x1, y1, x2, y2,
         segdata->blur_winsz, segdata->tmp_data, segdata->blur_data) < 0) {
     LOG_ERR("Failed to blur the image");
     return -1;

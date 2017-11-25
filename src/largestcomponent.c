@@ -21,10 +21,10 @@ find_connected_component(bool *threshold_data,
   c->count++;
 
   for (int i = x - 1; i <= x + 1; i++) {
+    if (i < 0 || i >= h) continue;
     for (int j = y - 1; j <= y + 1; j++) {
-      if (i >= 0 && j >= 0 &&
-          i < h && j < w &&
-          *(threshold_data + (i * w) + j)) {
+      if (j < 0 || j >= w) continue;
+      if (*(threshold_data + (i * w) + j)) {
         find_connected_component(threshold_data, i, j, w, h, c);
       }
     }
