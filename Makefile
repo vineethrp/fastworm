@@ -22,9 +22,14 @@ ifeq ($(DEBUG), 1)
 else
   CFLAGS += -Ofast
 endif
+
 CFLAGS += -std=gnu99
 CFLAGS += -Wall -Werror
 CFLAGS += -I$(INC_DIR)
+
+ifeq ($(PROFILE), 1)
+	CFLAGS += -DPROFILE_SEGMENTER
+endif
 
 OMPI_CFLAGS = -I$(OMPI_INC_DIR)
 OMPI_LDFLAGS = -L$(OMPI_LIB_DIR)

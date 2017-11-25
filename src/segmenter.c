@@ -199,6 +199,8 @@ segdata_init(segment_task_t *args, char *filename, segdata_t *segdata)
   segdata->blur_winsz = args->blur_winsz;
   segdata->thresh_winsz = args->thresh_winsz;
   segdata->thresh_ratio = args->thresh_ratio;
+  if (!args->dynamic_threshold)
+    segdata->thresh_ratio -= 0.03;
 
   if (args->dynamic_threshold)
     segdata->thresh_fn = dynamic_threshold;
@@ -233,6 +235,7 @@ int
 segdata_reset(segdata_t *segdata, char *filename)
 {
   char *fname = NULL;
+  DEFINE_PROFILE_VARS
 
   if (segdata->img_data != NULL) {
     free(segdata->img_data);
@@ -240,8 +243,12 @@ segdata_reset(segdata_t *segdata, char *filename)
   }
 
   LOG_DEBUG("Loading %s to memory", filename);
+
+  START_PROFILE
   segdata->img_data = stbi_load(filename, &segdata->width,
       &segdata->height, &segdata->channels, 1);
+  END_PROFILE("imgload")
+
   if (segdata->img_data == NULL) {
     LOG_ERR("Failed to load the image to memory!");
     goto err;
@@ -303,6 +310,7 @@ int segdata_process(segdata_t *segdata)
   int x1, x2, y1, y2;
   connected_component_t largest;
   int offset = segdata->srch_winsz / 2;
+  DEFINE_PROFILE_VARS
 
   if (segdata == NULL) {
     LOG_ERR("Inavlid segdata!");
@@ -326,11 +334,13 @@ int segdata_process(segdata_t *segdata)
     x2 = h, y2 = w;
   }
 
+  START_PROFILE
   if (greyscale_blur(segdata->img_data, w, h, x1, y1, x2, y2,
         segdata->blur_winsz, segdata->tmp_data, segdata->blur_data) < 0) {
     LOG_ERR("Failed to blur the image");
     return -1;
   }
+  END_PROFILE("blur")
   LOG_DEBUG("greyscal_blur complete");
 
   if (segdata->debug_imgs) {
@@ -338,12 +348,14 @@ int segdata_process(segdata_t *segdata)
         segdata->height, 1, segdata->blur_data, 0);
   }
 
+  START_PROFILE
   if (segdata->thresh_fn(segdata->blur_data, w, h, x1, y1, x2, y2,
         segdata->thresh_winsz, segdata->thresh_ratio,
         segdata->integral_data, segdata->threshold_data) < 0) {
     LOG_ERR("Thresholding failed!");
     return -1;
   }
+  END_PROFILE("threshold")
   LOG_DEBUG("Threshold complete");
 
   if (segdata->debug_imgs) {
@@ -351,8 +363,10 @@ int segdata_process(segdata_t *segdata)
         segdata->threshold_data, segdata->tmp_data, w, h);
   }
 
+  START_PROFILE
   largest = largest_component(segdata->threshold_data,
       x1, y1, x2, y2, w, h);
+  END_PROFILE("largestcomponent")
   LOG_DEBUG("largestcomponent completed");
 
   if (largest.count <= 0) {

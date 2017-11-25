@@ -182,7 +182,7 @@ simple_threshold(unsigned char *img_data, int w, int h,
     int threshold_winsz, float threshold_ratio,
     int *integrals, bool *threshold)
 {
-  int threshold_pixel = 254 * threshold_ratio;
+  unsigned char threshold_pixel = 255 * threshold_ratio;
 
   for (int i = x1; i < x2; i++) {
     for (int j = y1; j < y2; j++) {
