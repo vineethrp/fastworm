@@ -34,6 +34,7 @@ dispatch_segmenter_tasks(segment_task_t *task)
   pthread_t thrs[TASKS_MAX];
   int frames_per_thread;
   int spilled_tasks, prev_start, prev_nr_frames;
+  bool reports_alloced = false;
   segment_task_t main_task = { 0 };
   segment_task_t thr_tasks[TASKS_MAX];
 
@@ -42,10 +43,13 @@ dispatch_segmenter_tasks(segment_task_t *task)
 
   frames_per_thread = task->nr_frames / task->nr_tasks;
 
-  task->reports = (report_t *) calloc(task->nr_frames, sizeof(report_t));
   if (task->reports == NULL) {
-    LOG_ERR("Failed to allocate reports!");
-    return -1;
+    task->reports = (report_t *) calloc(task->nr_frames, sizeof(report_t));
+    if (task->reports == NULL) {
+      LOG_ERR("Failed to allocate reports!");
+      return -1;
+    }
+    reports_alloced = true;
   }
 
   /*
@@ -72,8 +76,10 @@ dispatch_segmenter_tasks(segment_task_t *task)
     }
     prev_start = thr_tasks[i].start;
     prev_nr_frames = thr_tasks[i].nr_frames;
-    LOG_XX_DEBUG("Thread %d: start=%d, nr_frames=%d", i, thr_tasks[i].start, thr_tasks[i].nr_frames);
-    if (pthread_create(&thrs[i], NULL, task_segmenter, (void *)&thr_tasks[i]) < 0) {
+    LOG_XX_DEBUG("Thread %d: start=%d, nr_frames=%d",
+        i, thr_tasks[i].start, thr_tasks[i].nr_frames);
+    if (pthread_create(&thrs[i], NULL, task_segmenter,
+          (void *)&thr_tasks[i]) < 0) {
       LOG_ERR("Failed to create thread %d!", i);
       goto err;
     }
@@ -102,7 +108,8 @@ dispatch_segmenter_tasks(segment_task_t *task)
   return 0;
 
 err:
-  free(task->reports);
+  if (reports_alloced && task->reports)
+    free(task->reports);
   return -1;
 }
 

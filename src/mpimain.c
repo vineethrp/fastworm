@@ -18,7 +18,7 @@
 
 int MPI_Report_Struct_Type(MPI_Datatype *output_type);
 int mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type);
-int mpi_slave(segment_task_t *task, MPI_Datatype *report_type);
+int mpi_slave(int taskid, segment_task_t *task, MPI_Datatype *report_type);
 
 static int input[2]; // { starting_frame, nr_frames }
 static int output[3]; // { status, starting_frame, nr_frames }
@@ -62,7 +62,7 @@ main(int argc, char *argv[])
   if (taskid == TASK_MASTER) {
     ret = mpi_master(&task, nr_tasks, &report_type);
   } else {
-    ret = mpi_slave(&task, &report_type);
+    ret = mpi_slave(taskid, &task, &report_type);
   }
 
   log_fini();
@@ -153,10 +153,9 @@ mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
   // Masters piece of the task.
   task->base = task->start = 0;
   task->nr_frames = frames_per_task;
-  task->nr_tasks = 1;
   LOG_XX_DEBUG("MPI master task details: start_frame=%d, nr_frames=%di, nr_tasks=%d",
       task->start, task->nr_frames, task->nr_tasks);
-  task_segmenter(task);
+  dispatch_segmenter_tasks(task);
 
   // Receive the job output.
   for (int i = 1; i < nr_tasks; i++) {
@@ -174,24 +173,24 @@ mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
 }
 
 int
-mpi_slave(segment_task_t *task, MPI_Datatype *report_type)
+mpi_slave(int taskid, segment_task_t *task, MPI_Datatype *report_type)
 {
   MPI_Status status;
 
-  LOG_INFO("MPI slave %d starting..");
+  LOG_INFO("MPI slave %d starting..", taskid);
   MPI_Recv(input, 2, MPI_INT, TASK_MASTER, TAG_INPUT, MPI_COMM_WORLD, &status);
-  LOG_XX_DEBUG("MPI slave %d: start_frame=%d, nr_frames=%d",
-      input[0], input[1]);
 
   task->base = task->start = input[0];
   task->nr_frames = input[1];
-  task->nr_tasks = 1;
+  LOG_XX_DEBUG("MPI slave %d: start_frame=%d, nr_frames=%d, nr_tasks=%d",
+      taskid, input[0], input[1], task->nr_tasks);
+
   task->reports = (report_t *) calloc(task->nr_frames, sizeof(report_t));
   if (task->reports == NULL) {
     LOG_ERR("Failed to allocate reports!");
     return -1;
   }
-  task_segmenter(task);
+  dispatch_segmenter_tasks(task);
 
   output[0] = 0;
   output[1] = task->base;

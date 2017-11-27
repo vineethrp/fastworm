@@ -9,8 +9,6 @@ DEPS_DIR = $(BLD_DIR)/deps
 BIN_DIR = $(BLD_DIR)/bin
 SEGMENTER = $(BIN_DIR)/segmenter
 
-OMPI_INC_DIR = /usr/local/include
-OMPI_LIB_DIR = /usr/local/lib
 OMPI_OBJ_DIR = $(OBJ_DIR)/mpi
 OMPI_DEPS_DIR = $(DEPS_DIR)/objs/mpi
 MPISEGMENTER = $(BIN_DIR)/msegmenter
@@ -31,12 +29,7 @@ ifeq ($(PROFILE), 1)
 	CFLAGS += -DPROFILE_SEGMENTER
 endif
 
-OMPI_CFLAGS = -I$(OMPI_INC_DIR)
-OMPI_LDFLAGS = -L$(OMPI_LIB_DIR)
-
 LDLIBS = -lm -lpthread
-
-MPI_LDLIBS = -lmpi
 
 MAIN_OBJS =       \
             main.o
@@ -48,7 +41,7 @@ SEGMENTER_OBJS =                    \
                  argparser.o        \
                  largestcomponent.o \
                  log.o              \
-								 profile.o          \
+                 profile.o          \
                  segmenter.o        \
                  segmentation.o
 
@@ -62,7 +55,7 @@ $(OBJ_DIR)/%.o : $(SRC_DIR)/%.c | $(OBJ_DIR) $(DEPS_DIR)
 	$(CC) $(CFLAGS) -MMD -MF $(DEPS_DIR)/$(*F).d -c -o $@ $<
 
 $(OMPI_OBJ_DIR)/%.o : $(SRC_DIR)/%.c | $(OMPI_OBJ_DIR) $(OMPI_DEPS_DIR)
-	$(MPICC) $(CFLAGS) $(OMPI_CFLAGS) -MMD -MF $(OMPI_DEPS_DIR)/$(*F).d -c -o $@ $<
+	$(MPICC) $(CFLAGS) -MMD -MF $(OMPI_DEPS_DIR)/$(*F).d -c -o $@ $<
 
 $(OBJ_DIR) $(DEPS_DIR) $(BIN_DIR) $(OMPI_OBJ_DIR) $(OMPI_DEPS_DIR):
 		$(MKDIR) $@
@@ -71,7 +64,7 @@ $(SEGMENTER): $(SEGMENTER_OBJS:%.o=$(OBJ_DIR)/%.o) $(MAIN_OBJS:%.o=$(OBJ_DIR)/%.
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 $(MPISEGMENTER): $(MPIMAIN_OBJS:%.o=$(OMPI_OBJ_DIR)/%.o) $(SEGMENTER_OBJS:%.o=$(OMPI_OBJ_DIR)/%.o) | $(BIN_DIR)
-	$(MPICC) $(LDFLAGS) $(OMPI_LDFLAGS) -o $@ $^ $(LDLIBS) $(MPI_LDLIBS)
+	$(MPICC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 .PHONY: clean
 
