@@ -1,1 +1,79 @@
 Worm Segmentation feature extractor in C
+========================================
+
+
+This code is a Worm Segmentation implementation writen from scratch in C. This
+doesn't use any external libraries. Uses STB header file for the JPEG decoding.
+
+
+Requirements
+------------
+No external libraries are required. For MPI, OpenMPI libraries needs to be
+present.
+
+Building
+--------
+
+$ make all
+
+All build artifacts will be in build directory at the root of the source.
+Object files: build/obj
+Binaries: build/bin
+
+"make all" builds two binaries
+build/bin/segmenter  : Stand alone C application
+build/bin/msegmenter : MPI version of the segmenter
+
+
+To make with out optimization and non-stripped build
+$ make DEBUG=1 all
+
+To build with profiling enabled
+$ make PROFILE=1 all
+
+NOTE: Profiling is enabled at runtime only with  verbose debug
+
+Running
+-------
+
+1. Help
+$ build/bin/segmenter --help
+
+2. Process 1000 images in data folder
+$ build/bin/segmenter -i data -f 1000
+
+segmenter by default uses as many threads as there are cores in the system.
+It stores the output(output.txt) in out folder. The logs are also in out
+folder.
+
+3. Process 1000 images using a single thread
+$ build/bin/segmenter -i data -f 1000 -j 1
+
+4. Process 1000 images starting from 10th image
+$ build/bin/segmenter -i data -s 10 -f 1000
+
+5. Process 100 images are store the output to /tmp/out
+$ build/bin/segmenter -i data -f 1000 -o /tmp/out
+
+6. Enable verbose debug messages
+$ build/bin/segmenter -i data -vvvv
+
+Each occurence of v increases the verbosity of messages in the log file. Log
+file is stored in out/segmenter.log
+
+
+MPI Version
+----------
+1. Run on two nodes with default options
+$ mpirun  -H node1,node2 build/bin/msegmenter 
+
+2. Run on two nodes with 1 thread per job
+$ mpirun -H node1,node2 build/bin/msegmenter -j 1
+
+3. Run on two nodes with one job per node and 2 threads per job
+$ mpirun -H node1,node2 -map-by ppr:1:node --bind-to none  build/bin/msegmenter -j 1
+
+
+
+
+
