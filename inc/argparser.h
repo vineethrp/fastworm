@@ -6,6 +6,7 @@
  */
 typedef struct segment_task_s prog_args_t;
 
+#define PROGS_ARGS_DEFAULT_PROJECT  "MEDIX"
 #define PROG_ARGS_DEFAULT_INPUT_DIR "data"
 #define PROG_ARGS_DEFAULT_OUTPUT_DIR "out"
 #define PROG_ARGS_DEFAULT_OUTPUT_FILE "output.txt"

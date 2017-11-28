@@ -19,24 +19,25 @@ int validate_options(prog_args_t *prog_args);
 int parse_options(int key, char *arg, struct argp_state *state);
 
 struct argp_option options[] = {
-  {"project",         'P', "NAME",       0,                    "The name of the project to process."},
-  {"input-dir",           'i', "PATH",       0,  "Path to input images."},
-  {"output-dir",          'o', "PATH",  0,  "Output file path."},
-  {"output-file",          'O', "FILE NAME",  0,  "Output file path."},
-  {"padding",         'p', "NUMBER",     0,  "Number of digits in the file name."},
-  {"frames",          'f', "FRAMES",     0,  "Number of frames to be processed."},
-  {"extension",       'e', "STRING",     0,  "Extension of the image files."},
-  {"minarea",         'a', "NUMBER",     0,  "The lower bound for a candidate worm component."},
-  {"maxarea",        'A', "NUMBER",     0,  "The upper bound for a candidate worm component."},
-  {"search_winsz", 's', "NUMBER",  0,  "Width and height of crop area."},
-  {"blur_winsz",     'b', "NUMBER",  0,  "Width and height of the sliding window in the box blur."},
-  {"thresh_winsz", 't', "NUMBER",  0,  "Width and height of the sliding window in the dynamic threshold."},
-  {"thresh_ratio",    'T', "FLOAT",      0,  "Pixel intensity."},
-  {"jobs",           'j',  "NUMBER",   0, "Number of concurrent jobs(threads) to run locally"},
-  {"logfile",         'l', "FILE NAME",  0,  "Path to log file."},
-  {"verbose",         'v', 0, 0,  "Produce verbose output."},
-  {"debug",           'd', 0, 0, "Enable creation of debug images"},
-  {"dynamic_threshold", 'D', 0, 0, "Use dynamic thresholding algorithm"},
+  {"project",           'P', "NAME",      0, "The name of the project to process."},
+  {"input-dir",         'i', "PATH",      0, "Path to input images."},
+  {"output-dir",        'o', "PATH",      0, "Output file path."},
+  {"output-file",       'O', "FILE NAME", 0, "Output file path."},
+  {"padding",           'p', "NUMBER",    0, "Number of digits in the file name."},
+  {"start-frame",       's', "NUMBER",    0, "Start number of the first frame."},
+  {"frames",            'f', "FRAMES",    0, "Number of frames to be processed."},
+  {"extension",         'e', "STRING",    0, "Extension of the image files."},
+  {"minarea",           'a', "NUMBER",    0, "The lower bound for a candidate worm component."},
+  {"maxarea",           'A', "NUMBER",    0, "The upper bound for a candidate worm component."},
+  {"search_winsz",      'S', "NUMBER",    0, "Width and height of crop area."},
+  {"blur_winsz",        'b', "NUMBER",    0, "Width and height of the sliding window in the box blur."},
+  {"thresh_winsz",      't', "NUMBER",    0, "Width and height of the sliding window in the dynamic threshold."},
+  {"thresh_ratio",      'T', "FLOAT",     0, "Pixel intensity."},
+  {"jobs",              'j', "NUMBER",    0, "Number of concurrent jobs(threads) to run locally"},
+  {"logfile",           'l', "FILE NAME", 0, "Path to log file."},
+  {"verbose",           'v', 0,           0, "Produce verbose output."},
+  {"debug",             'd', 0,           0, "Enable creation of debug images"},
+  {"dynamic_threshold", 'D', 0,           0, "Use dynamic thresholding algorithm"},
   { 0 }
 };
 
@@ -61,14 +62,6 @@ parse_options(int key, char *arg, struct argp_state *state)
   prog_args_t *prog_args = (prog_args_t *)state->input;
 
   switch (key) {
-    /*
-    case ARGP_KEY_END:
-      if (state->arg_num < 1) {
-        fprintf(stderr, "Insufficient number of arguments!\n");
-        argp_usage(state);
-      }
-      break;
-      */
     case 'P':
       strcpy(prog_args->project, arg);
       break;
@@ -87,6 +80,9 @@ parse_options(int key, char *arg, struct argp_state *state)
     case 'f':
       prog_args->nr_frames = atoi(arg);
       break;
+    case 's':
+      prog_args->base = atoi(arg);
+      break;
     case 'e':
       strcpy(prog_args->ext, arg);
       break;
@@ -96,7 +92,7 @@ parse_options(int key, char *arg, struct argp_state *state)
     case 'A':
       prog_args->maxarea = atoi(arg);
       break;
-    case 's':
+    case 'S':
       prog_args->srch_winsz = atoi(arg);
       break;
     case 'b':
@@ -138,8 +134,7 @@ int
 validate_options(prog_args_t *prog_args)
 {
   if (prog_args->project[0] == 0) {
-    fprintf(stderr, "Project not specified!\n");
-    return -1;
+    strcpy(prog_args->project, PROGS_ARGS_DEFAULT_PROJECT);
   }
 
   if (prog_args->input_dir[0] == 0) {
@@ -209,8 +204,8 @@ validate_options(prog_args_t *prog_args)
         prog_args->project, prog_args->input_dir, prog_args->output_dir);
     fprintf(stdout, "Output file: %s, log file: %s\n",
         prog_args->outfile, prog_args->logfile);
-    fprintf(stdout, "padding: %d, frames: %d\n",
-        prog_args->padding, prog_args->nr_frames);
+    fprintf(stdout, "padding: %d, start_frame: %d, frames: %d\n",
+        prog_args->padding, prog_args->base, prog_args->nr_frames);
     fprintf(stdout, "minarea: %d, maxarea: %d, blur_winsz: %d\n",
         prog_args->minarea, prog_args->maxarea, prog_args->blur_winsz);
     fprintf(stdout, "srch_winsz: %d, thresh_winsz: %d, thresh_ratio: %f\n",

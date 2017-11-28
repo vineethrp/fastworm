@@ -394,7 +394,7 @@ int segdata_process(segdata_t *segdata)
   segdata->centroid_x = largest.total_x / largest.count;
   segdata->centroid_y = largest.total_y / largest.count;
   segdata->area = largest.count;
-  LOG_INFO("%d %d %d",
+  LOG_DEBUG("Centroid details: %d %d %d",
       segdata->centroid_x, segdata->centroid_y      ,
       largest.count);
 
