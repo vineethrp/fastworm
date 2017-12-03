@@ -4,3 +4,4 @@ build/deps/*
 build/bin/*
 debug/*
 *.log
+out/*

@@ -15,7 +15,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-
 #include "segmenter.h"
 #include "log.h"
 #include "argparser.h"
@@ -23,10 +22,23 @@
 #include "largestcomponent.h"
 #include "profile.h"
 
+/*
+ * This file implements the segmenter thread functionalities.
+ * Calls into functions in segmentation.c to perform the
+ * actual segmentation.
+ */
+
 static int write_threshold(char *filename,
     bool *threshold_data, unsigned char *data, int w, int h);
 static int filepath(int padding, int num, char *prefix, char *ext, char *path);
 
+/*
+ * Performs segmentation of nr_frames images.
+ *
+ * Create nr_tasks - 1 threads and distribute the work.
+ * Perform nr_frames / nr_tasks segmentations in this
+ * thread.
+ */ 
 int
 dispatch_segmenter_tasks(segment_task_t *task)
 {
@@ -113,6 +125,9 @@ err:
   return -1;
 }
 
+/*
+ * pthread function for segmentation.
+ */
 void *
 task_segmenter(void *data)
 {
@@ -154,6 +169,12 @@ task_segmenter(void *data)
   segdata_fini(&segdata);
   return (void *)(unsigned long long)ret;
 }
+
+
+/*
+ * Helper functions for initialising and
+ * manipulating segmentation structures.
+ */
 
 int
 segdata_init(segment_task_t *args, char *filename, segdata_t *segdata)
@@ -275,6 +296,7 @@ segdata_reset(segdata_t *segdata, char *filename)
   /*
    * Reset debug fields.
    */
+
   // create debug folder
   errno = 0;
   if (mkdir(DEBUG_DIR, 0750) < 0 && errno != EEXIST) {
@@ -311,6 +333,9 @@ err:
   return -1;
 }
 
+/*
+ * Logic to perform segmentation on a single image.
+ */
 int segdata_process(segdata_t *segdata)
 {
   int w, h;
@@ -401,6 +426,10 @@ int segdata_process(segdata_t *segdata)
   return 0;
 }
 
+/*
+ * Helper function to create the binary image from
+ * threshold data.
+ */
 static int
 write_threshold(char *filename, bool *threshold_data,
     unsigned char *data, int w, int h)
@@ -439,6 +468,11 @@ filepath(int padding, int num, char *prefix, char *ext, char *path)
   return 0;
 }
 
+/*
+ * Helper function to write the segmentation results.
+ * results is a 3 field tupe
+ * <centroid width(x)> <centroid height(y)> <area>
+ */
 int
 write_output(char *filepath, report_t *reports, int nr_frames)
 {

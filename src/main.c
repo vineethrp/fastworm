@@ -12,6 +12,10 @@
 #include "argparser.h"
 #include "segmenter.h"
 
+/*
+ * Entry point for segmenter.
+ */
+
 int
 main(int argc, char **argv)
 {

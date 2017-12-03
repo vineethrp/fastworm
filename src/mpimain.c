@@ -23,6 +23,10 @@ int mpi_slave(int taskid, segment_task_t *task, MPI_Datatype *report_type);
 static int input[2]; // { starting_frame, nr_frames }
 static int output[3]; // { status, starting_frame, nr_frames }
 
+/*
+ * Entry point for msegmenter.
+ */
+
 int
 main(int argc, char *argv[])
 {
@@ -123,7 +127,7 @@ mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
       nr_tasks, frames_per_task, spilled_frames, task->nr_frames);
 
   /*
-   * Master task taked first frames_per_task frames to process
+   * Master task takes first frames_per_task frames to process
    * So first slave's starting frame_is is frames_per_task.
    */
   next_frame = frames_per_task;
@@ -135,7 +139,7 @@ mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
   if (spilled_frames)
     frames_per_task++;
 
-  // Send Job details.
+  // Send Job details to slaves.
   for (int i = 1; i < nr_tasks; i++) {
     input[0] = next_frame;
     input[1] = frames_per_task;
@@ -150,7 +154,7 @@ mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
     MPI_Send(input, 2, MPI_INT, i, TAG_INPUT, MPI_COMM_WORLD);
   }
 
-  // Masters piece of the task.
+  // Master's piece of the task.
   task->base = task->start = 0;
   task->nr_frames = frames_per_task;
   LOG_XX_DEBUG("MPI master task details: start_frame=%d, nr_frames=%di, nr_tasks=%d",
