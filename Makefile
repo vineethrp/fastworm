@@ -47,6 +47,8 @@ SEGMENTER_OBJS =                    \
 
 .PHONY: all
 
+segmenter: $(SEGMENTER)
+
 all: $(SEGMENTER) mpi
 
 mpi: $(MPISEGMENTER)
