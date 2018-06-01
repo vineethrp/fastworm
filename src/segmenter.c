@@ -452,7 +452,8 @@ filepath(int padding, int num, char *prefix, char *ext, char *path)
   if (path == NULL)
     return -1;
 
-  if (sprintf(format, "%s/%%0%dd.%s", prefix, padding, ext) <= 0) {
+  if (snprintf(format, NAME_MAX,
+	       "%s/%%0%dd.%s", prefix, padding, ext) <= 0) {
    return -1;
   }
 

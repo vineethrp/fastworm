@@ -20,7 +20,7 @@ int
 main(int argc, char **argv)
 {
   int ret = 0;
-  char file_path[PATH_MAX];
+  char file_path[PATH_MAX + NAME_MAX];
   segment_task_t task = { 0 };
 
   if (parse_arguments(argc, argv, &task) < 0) {
@@ -35,7 +35,7 @@ main(int argc, char **argv)
     exit(1);
   }
 
-  sprintf(file_path, "%s/%s", task.output_dir, task.logfile);
+  snprintf(file_path, PATH_MAX + NAME_MAX, "%s/%s", task.output_dir, task.logfile);
   if (log_init(task.verbosity, 0, file_path) < 0) {
     exit (1);
   }
@@ -47,7 +47,7 @@ main(int argc, char **argv)
     /*
      * Print the results returned by all workers.
      */
-    sprintf(file_path, "%s/%s", task.output_dir, task.outfile);
+    snprintf(file_path, PATH_MAX + NAME_MAX, "%s/%s", task.output_dir, task.outfile);
     write_output(file_path, task.reports, task.nr_frames);
   } else {
     ret = -1;
