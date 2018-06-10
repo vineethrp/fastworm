@@ -43,7 +43,8 @@ SEGMENTER_OBJS =                    \
                  log.o              \
                  profile.o          \
                  segmenter.o        \
-                 segmentation.o
+                 segmentation.o			\
+								 work_queue.o
 
 .PHONY: all
 
