@@ -47,8 +47,6 @@ wq_init(int q_cap, int nr_frames)
     goto err;
   }
 
-  wq->need_put = 0;
-  wq->need_get = 0;
   wq->cap = q_cap;
   wq->sz = 0;
   wq->head = wq->tail = 0;
@@ -83,42 +81,27 @@ wq_fini(wq_t *wq) {
 }
 
 int
-get_work(wq_t *wq, int nr_works, work_t *w)
+pop_work(wq_t *wq, work_t *w)
 {
-  if (wq == NULL || w == NULL || nr_works <= 0) {
-    LOG_ERR("Invalid arguements to get_work: wq=0x%lX, w=0x%lX,nr_works=%d",
-        wq, w, nr_works);
-    return -1;
-  }
-  if (nr_works > wq->cap) {
-    LOG_ERR("Request for more items than max queue size: nr_works=%d",
-        nr_works);
+  if (wq == NULL || w == NULL) {
+    LOG_ERR("Invalid arguements to get_work");
     return -1;
   }
 
   pthread_mutex_lock(&wq->q_mutex);
-  while (wq->sz < nr_works) {
-    if (wq->need_get == 0 || wq->need_get > nr_works) {
-      wq->need_get = nr_works;
-    }
+  while (wq->sz == 0) {
     pthread_cond_wait(&wq->q_cond, &wq->q_mutex);
   }
 
-  int i;
-  for (i = 0; i < nr_works; i++) {
-    w[i] = wq->q[wq->tail % wq->cap];
-    wq->tail++;
-    wq->sz--;
-    if (wq->tail == wq->head) {
-      break;
-    }
-  }
-  assert(i = nr_works);
+  *w = wq->q[wq->tail % wq->cap];
+  wq->tail++;
+  wq->sz--;
 
-  if (wq->need_put > 0 && (wq->cap - wq->sz) >= wq->need_put)
-      pthread_cond_broadcast(&wq->q_cond);
-
-  wq->need_get = 0;
+  /*
+   * Signal the producer if the queue is empty.
+   */
+  if (wq->sz == 0)
+    pthread_cond_broadcast(&wq->q_cond);
 
   pthread_mutex_unlock(&wq->q_mutex);
 
@@ -126,43 +109,25 @@ get_work(wq_t *wq, int nr_works, work_t *w)
 }
 
 int
-put_work(wq_t *wq, int nr_works, work_t *w)
+push_work(wq_t *wq, work_t w)
 {
-  if (wq == NULL || w == NULL || nr_works <= 0) {
-    LOG_ERR("Invalid arguements to put_work: wq=0x%lX, w=0x%lX,nr_works=%d",
-        wq, w, nr_works);
-    return -1;
-  }
-  if (nr_works > wq->cap) {
-    LOG_ERR("Request to put more items than max queue size: nr_works=%d",
-        nr_works);
+  if (wq == NULL) {
+    LOG_ERR("Invalid arguements to put_work");
     return -1;
   }
 
   pthread_mutex_lock(&wq->q_mutex);
-  while (wq->sz + nr_works >= wq->cap) {
-    if (wq->need_put == 0 || wq->need_put > nr_works) {
-      wq->need_put = nr_works;
-    }
+  while (wq->sz == wq->cap) {
     pthread_cond_wait(&wq->q_cond, &wq->q_mutex);
   }
 
-  int i = 0;
-  for (i = 0; i < nr_works; i++) {
-    wq->q[wq->head % wq->cap] = w[i];
-    wq->head++;
-    wq->sz++;
-    assert(wq->sz > wq->cap);
-    if (wq->sz == wq->cap) {
-      break;
-    }
-  }
-  assert(i = nr_works);
+  wq->q[wq->head % wq->cap] = w;
+  wq->head++;
+  wq->sz++;
 
-  if (wq->need_get > 0 && wq->sz >= wq->need_get)
-      pthread_cond_broadcast(&wq->q_cond);
+  if (wq->sz == 1)
+    pthread_cond_broadcast(&wq->q_cond);
 
-  wq->need_put = 0;
   pthread_mutex_unlock(&wq->q_mutex);
   return 0;
 }

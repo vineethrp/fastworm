@@ -2,6 +2,7 @@
 
 typedef struct work_s {
   int frame;
+  int padding;
   int centroid_x;
   int centroid_y;
   int area;
@@ -17,11 +18,9 @@ typedef struct wq_s {
   int tail;
   pthread_mutex_t q_mutex;
   pthread_cond_t q_cond;
-  int need_put;
-  int need_get;
 } wq_t;
 
 wq_t *wq_init();
 void wq_fini(wq_t *);
-int get_work(wq_t *wq, int nr_works, work_t *w);
-int put_work(wq_t *wq, int nr_works, work_t *w);
+int pop_work(wq_t *wq, work_t *w);
+int push_work(wq_t *wq, work_t w);
