@@ -34,6 +34,7 @@ typedef struct segment_task_s {
    */
   char project[NAME_MAX];
   char input_dir[PATH_MAX];
+  char input_file[PATH_MAX];
   char output_dir[PATH_MAX];
   char outfile[NAME_MAX];
   char logfile[NAME_MAX];

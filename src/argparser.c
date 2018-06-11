@@ -21,6 +21,7 @@ int parse_options(int key, char *arg, struct argp_state *state);
 struct argp_option options[] = {
   {"project",           'P', "NAME",      0, "The name of the project to process."},
   {"input-dir",         'i', "PATH",      0, "Path to input images."},
+  {"input-file",        'I', "PATH",      0, "Path to input log file."},
   {"output-dir",        'o', "PATH",      0, "Output file path."},
   {"output-file",       'O', "FILE NAME", 0, "Output file path."},
   {"padding",           'p', "NUMBER",    0, "Number of digits in the file name."},
@@ -66,6 +67,9 @@ parse_options(int key, char *arg, struct argp_state *state)
       break;
     case 'i':
       strcpy(prog_args->input_dir, arg);
+      break;
+    case 'I':
+      strcpy(prog_args->input_file, arg);
       break;
     case 'o':
       strcpy(prog_args->output_dir, arg);
@@ -158,10 +162,6 @@ validate_options(prog_args_t *prog_args)
     prog_args->padding = PROG_ARGS_DEFAULT_PADDING;
   }
 
-  if (prog_args->nr_frames == 0) {
-    prog_args->nr_frames = PROG_ARGS_DEFAULT_FRAMES;
-  }
-
   if (prog_args->minarea == 0) {
     prog_args->minarea = PROG_ARGS_DEFAULT_MINAREA;
   }
@@ -193,6 +193,11 @@ validate_options(prog_args_t *prog_args)
 
   if (prog_args < LOG_ERR) {
     prog_args->verbosity = LOG_INFO;
+  }
+
+  if (prog_args->nr_frames == 0) {
+    fprintf(stderr, "mandatory option -f either not specified or invalid value\n");
+    return -1;
   }
 
   if (prog_args->verbosity > LOG_INFO) {
