@@ -11,12 +11,11 @@
 #include <pthread.h>
 
 #include "log.h"
-#include "argparser.h"
-#include "segmenter.h"
 #include "work_queue.h"
+#include "segmenter.h"
 
 wq_t *
-wq_init(int q_cap, int nr_frames)
+wq_init(int q_cap)
 {
   wq_t *wq = (wq_t *) malloc(sizeof(wq_t));
   if (wq == NULL) {
@@ -31,13 +30,6 @@ wq_init(int q_cap, int nr_frames)
   }
   wq->q = q;
 
-  report_t *report = (report_t *) calloc(nr_frames, sizeof(report_t));
-  if (report == NULL) {
-    LOG_ERR("Failed to allocate the report table");
-    goto err;
-  }
-  wq->report = report;
-
   if (pthread_mutex_init(&wq->q_mutex, NULL) != 0) {
     LOG_ERR("Failed to initialize work queue mutex");
     goto err;
@@ -50,15 +42,13 @@ wq_init(int q_cap, int nr_frames)
   wq->cap = q_cap;
   wq->sz = 0;
   wq->head = wq->tail = 0;
+  wq->done = false;
 
   return wq;
 
 err:
   if (wq->q)
     free(wq->q);
-
-  if (wq->report)
-    free(wq->report);
 
   if (wq)
     free(wq);
@@ -71,9 +61,6 @@ wq_fini(wq_t *wq) {
   if (wq == NULL)
     return;
 
-  if (wq->report)
-    free(wq->report);
-
   if (wq->q)
     free(wq->q);
 
@@ -81,53 +68,73 @@ wq_fini(wq_t *wq) {
 }
 
 int
-pop_work(wq_t *wq, work_t *w)
+wq_pop_work(wq_t *wq, work_t *w)
 {
+  int ret = 0;
+
   if (wq == NULL || w == NULL) {
     LOG_ERR("Invalid arguements to get_work");
     return -1;
   }
 
   pthread_mutex_lock(&wq->q_mutex);
-  while (wq->sz == 0) {
+  while (wq->sz == 0 && !wq->done) {
     pthread_cond_wait(&wq->q_cond, &wq->q_mutex);
   }
 
-  *w = wq->q[wq->tail % wq->cap];
-  wq->tail++;
-  wq->sz--;
+  if (!wq->done) {
+    *w = wq->q[wq->tail % wq->cap];
+    wq->tail++;
+    wq->sz--;
+    ret++;
 
-  /*
-   * Signal the producer if the queue is empty.
-   */
-  if (wq->sz == 0)
-    pthread_cond_broadcast(&wq->q_cond);
+    /*
+     * Signal the producer if the queue is empty.
+     */
+    if (wq->sz == 0)
+      pthread_cond_broadcast(&wq->q_cond);
+  }
 
   pthread_mutex_unlock(&wq->q_mutex);
 
-  return 0;
+  return ret;
 }
 
 int
-push_work(wq_t *wq, work_t w)
+wq_push_work(wq_t *wq, work_t w)
 {
+  int ret = 0;
+
   if (wq == NULL) {
     LOG_ERR("Invalid arguements to put_work");
     return -1;
   }
 
   pthread_mutex_lock(&wq->q_mutex);
-  while (wq->sz == wq->cap) {
+  while (wq->sz == wq->cap && !wq->done) {
     pthread_cond_wait(&wq->q_cond, &wq->q_mutex);
   }
 
-  wq->q[wq->head % wq->cap] = w;
-  wq->head++;
-  wq->sz++;
+  if (!wq->done) {
+    wq->q[wq->head % wq->cap] = w;
+    wq->head++;
+    wq->sz++;
+    ret++;
 
-  if (wq->sz == 1)
-    pthread_cond_broadcast(&wq->q_cond);
+    if (wq->sz == 1)
+      pthread_cond_broadcast(&wq->q_cond);
+  }
 
   pthread_mutex_unlock(&wq->q_mutex);
-  return 0;
+  return ret;
+}
+
+void
+wq_mark_done(wq_t *wq) {
+  pthread_mutex_lock(&wq->q_mutex);
+  wq->done = true;
+  pthread_cond_broadcast(&wq->q_cond);
+  pthread_mutex_unlock(&wq->q_mutex);
+
+  return;
 }
