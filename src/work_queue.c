@@ -82,7 +82,7 @@ wq_pop_work(wq_t *wq, work_t *w)
     pthread_cond_wait(&wq->q_cond, &wq->q_mutex);
   }
 
-  if (!wq->done) {
+  if (!wq->done || wq->sz > 0) {
     *w = wq->q[wq->tail % wq->cap];
     wq->tail++;
     wq->sz--;
