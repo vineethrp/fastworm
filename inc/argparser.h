@@ -10,7 +10,7 @@ typedef struct segment_task_s prog_args_t;
 #define PROG_ARGS_DEFAULT_INPUT_DIR "data"
 #define PROG_ARGS_DEFAULT_OUTPUT_DIR "out"
 #define PROG_ARGS_DEFAULT_OUTPUT_FILE "output.txt"
-#define PROG_ARGS_DEFAULT_EXT "jpg"
+#define PROG_ARGS_DEFAULT_EXT "jpeg"
 #define PROG_ARGS_DEFAULT_LOGFILE "segmenter.log"
 #define PROG_ARGS_DEFAULT_PADDING 7
 #define PROG_ARGS_DEFAULT_FRAMES 1000

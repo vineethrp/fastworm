@@ -48,6 +48,7 @@ typedef struct segment_task_s {
   float thresh_ratio;
   bool debug_imgs;
   int nr_tasks;
+  bool static_job_alloc;
   int verbosity;
 
   /*
@@ -56,6 +57,7 @@ typedef struct segment_task_s {
   int base;       // Starting frame for this process.
   int start;      // Starting frame for this thread
   int nr_frames;  // Number of frames to process for this thread
+  wq_t *wq;
   report_t *reports;
 } segment_task_t;
 
@@ -102,8 +104,9 @@ typedef struct segdata_s {
   int area;
 } segdata_t;
 
-int segdata_init(segment_task_t *args, char *filename, segdata_t *segdata);
-int segdata_reset(segdata_t *segdata, char *filename);
+int segdata_init(segment_task_t *args, char *filename,
+                  segdata_t *segdata, int x, int y);
+int segdata_reset(segdata_t *segdata, char *filename, int x, int y);
 void segdata_fini(segdata_t *segdata);
 
 int segdata_process(segdata_t *segdata);
@@ -111,3 +114,5 @@ int segdata_process(segdata_t *segdata);
 int write_output(char *filepath, report_t *reports, int count);
 void *task_segmenter(void *data);
 int dispatch_segmenter_tasks(segment_task_t *task);
+int dispatch_segmenter_tasks_static(segment_task_t *task);
+int dispatch_segmenter_tasks_wq(segment_task_t *task);

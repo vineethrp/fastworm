@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <argp.h>
 
+#include "work_queue.h"
 #include "segmenter.h"
 #include "log.h"
 #include "argparser.h"
@@ -25,16 +26,16 @@ struct argp_option options[] = {
   {"output-dir",        'o', "PATH",      0, "Output file path."},
   {"output-file",       'O', "FILE NAME", 0, "Output file path."},
   {"padding",           'p', "NUMBER",    0, "Number of digits in the file name."},
-  {"start-frame",       's', "NUMBER",    0, "Start number of the first frame."},
   {"frames",            'f', "FRAMES",    0, "Number of frames to be processed."},
   {"extension",         'e', "STRING",    0, "Extension of the image files."},
   {"minarea",           'a', "NUMBER",    0, "The lower bound for a candidate worm component."},
   {"maxarea",           'A', "NUMBER",    0, "The upper bound for a candidate worm component."},
-  {"search_winsz",      'S', "NUMBER",    0, "Width and height of crop area."},
-  {"blur_winsz",        'b', "NUMBER",    0, "Width and height of the sliding window in the box blur."},
-  {"thresh_winsz",      't', "NUMBER",    0, "Width and height of the sliding window in the dynamic threshold."},
-  {"thresh_ratio",      'T', "FLOAT",     0, "Pixel intensity."},
+  {"search-winsz",      'S', "NUMBER",    0, "Width and height of crop area."},
+  {"blur-winsz",        'b', "NUMBER",    0, "Width and height of the sliding window in the box blur."},
+  {"thresh-winsz",      't', "NUMBER",    0, "Width and height of the sliding window in the dynamic threshold."},
+  {"thresh-ratio",      'T', "FLOAT",     0, "Pixel intensity."},
   {"jobs",              'j', "NUMBER",    0, "Number of concurrent jobs(threads) to run locally"},
+  {"static-job-alloc",  's', 0,           0, "Static job allocation to worker threads."},
   {"logfile",           'l', "FILE NAME", 0, "Path to log file."},
   {"verbose",           'v', 0,           0, "Produce verbose output."},
   {"debug",             'd', 0,           0, "Enable creation of debug images"},
@@ -84,7 +85,7 @@ parse_options(int key, char *arg, struct argp_state *state)
       prog_args->nr_frames = atoi(arg);
       break;
     case 's':
-      prog_args->base = atoi(arg);
+      prog_args->static_job_alloc = true;
       break;
     case 'e':
       strcpy(prog_args->ext, arg);
@@ -202,12 +203,15 @@ validate_options(prog_args_t *prog_args)
 
   if (prog_args->verbosity > LOG_INFO) {
     fprintf(stdout, "Program options:\n");
-    fprintf(stdout, "Project: %s, Input dir: %s, Output dir: %s\n",
-        prog_args->project, prog_args->input_dir, prog_args->output_dir);
+    fprintf(stdout, "Project: %s, Input dir: %s, Output dir: %s, frames: %d\n",
+        prog_args->project, prog_args->input_dir,
+        prog_args->output_dir, prog_args->nr_frames);
+    if (prog_args->static_job_alloc) {
+      fprintf(stdout, "padding: %d, start_frame: %d\n",
+          prog_args->padding, prog_args->base);
+    }
     fprintf(stdout, "Output file: %s, log file: %s\n",
         prog_args->outfile, prog_args->logfile);
-    fprintf(stdout, "padding: %d, start_frame: %d, frames: %d\n",
-        prog_args->padding, prog_args->base, prog_args->nr_frames);
     fprintf(stdout, "minarea: %d, maxarea: %d, blur_winsz: %d\n",
         prog_args->minarea, prog_args->maxarea, prog_args->blur_winsz);
     fprintf(stdout, "srch_winsz: %d, thresh_winsz: %d, thresh_ratio: %f\n",

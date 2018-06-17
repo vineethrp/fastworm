@@ -15,6 +15,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "work_queue.h"
 #include "segmenter.h"
 #include "log.h"
 #include "argparser.h"
@@ -32,6 +33,171 @@ static int write_threshold(char *filename,
     bool *threshold_data, unsigned char *data, int w, int h);
 static int filepath(int padding, int num, char *prefix, char *ext, char *path);
 
+int
+populate_work_queue(char *input_file, wq_t *wq, int nr_frames)
+{
+  int ret = -1;
+  FILE *fp = NULL;
+
+  if (input_file == NULL || wq == NULL) {
+    LOG_ERR("Invalid arguements to populate_work_queue");
+    goto out;
+  }
+
+  fp = fopen(input_file, "r");
+  if (fp == NULL) {
+    LOG_ERR("Failed to open the input file: %s(%s)",
+        strerror(errno), input_file);
+    goto out;
+  }
+
+  char frame_str[16];
+  unsigned long ts;
+  int x, y, f, count = 0;
+  while (fscanf(fp, "%s %lu %d %d %d\n", frame_str, &ts, &x, &y, &f) != EOF) {
+    errno = 0;
+    long frame = strtol(frame_str, NULL, 10);
+    if (errno != 0) {
+      LOG_ERR("Failed to convert the frame number from input file: %s", frame_str);
+      goto out;
+    }
+
+    int padding = strlen(frame_str);
+    work_t w = { 0 };
+    w.frame = frame;
+    w.padding = padding;
+    w.centroid_x = x;
+    w.centroid_y = y;
+    if (wq_push_work(wq, w) != 1) {
+      LOG_ERR("Failed to push the work into queue");
+      goto out;
+    }
+    count++;
+    if (count == nr_frames)
+      break;
+  }
+
+  ret = 0;
+
+out:
+  if (fp != NULL)
+    fclose(fp);
+  wq_mark_done(wq);
+  return ret;
+}
+
+void *
+task_segmenter_queue(void *data)
+{
+  int ret = -1;
+  char file_path[PATH_MAX];
+  bool need_segdata_init = true;
+  segment_task_t *task = NULL;
+  segdata_t segdata = { 0 };
+
+  task = (segment_task_t *)data;
+
+  while (true) {
+
+    work_t w = { 0 };
+    ret = wq_pop_work(task->wq, &w);
+    if (ret < 0) {
+      LOG_ERR("Failed to get the work from the work queue");
+      break;
+    } else if (ret == 0) {
+      LOG_DEBUG("Work queue is marked done");
+      break;
+    }
+
+    if (filepath(w.padding, w.frame, task->input_dir, task->ext, file_path) < 0) {
+      LOG_ERR("Failed to create filepath!");
+      break;
+    }
+    if (need_segdata_init) {
+      if (segdata_init(task, file_path, &segdata, w.centroid_x, w.centroid_y) < 0) {
+        LOG_ERR("Failed to initialize segdata");
+        break;
+      }
+      need_segdata_init = false;
+    } else {
+      if (segdata_reset(&segdata, file_path, w.centroid_x, w.centroid_y) < 0) {
+        LOG_ERR("Failed to reset segdata");
+        break;
+      }
+    }
+
+    segdata_process(&segdata);
+
+    task->reports[w.frame].frame_id = w.frame;
+    task->reports[w.frame].centroid_x = segdata.centroid_x;
+    task->reports[w.frame].centroid_y = segdata.centroid_y;
+    task->reports[w.frame].area = segdata.area;
+    ret = 0;
+  }
+
+  segdata_fini(&segdata);
+  return (void *)(unsigned long long)ret;
+}
+
+int
+dispatch_segmenter_tasks_wq(segment_task_t *task)
+{
+  if (task->nr_frames < task->nr_tasks)
+    task->nr_tasks = task->nr_frames;
+
+  if (task->reports == NULL) {
+    task->reports = (report_t *) calloc(task->nr_frames, sizeof(report_t));
+    if (task->reports == NULL) {
+      LOG_ERR("Failed to allocate reports!");
+      return -1;
+    }
+  }
+
+  task->wq = wq_init(WORK_QUEUE_DEFAULT_CAP);
+  if (task->wq == NULL) {
+    LOG_ERR("Failed to initialize the work queue");
+    return -1;
+  }
+
+  /*
+   * start nr_tasks - 1 threads (this main thread also does job!)
+   *
+   */
+  pthread_t thrs[TASKS_MAX];
+  for (int i = 0; i < task->nr_tasks - 1; i++) {
+    LOG_XX_DEBUG("Creating Thread %d", i);
+    if (pthread_create(&thrs[i], NULL, task_segmenter_queue,
+          (void *)task) < 0) {
+      LOG_ERR("Failed to create thread %d!", i);
+      goto err;
+    }
+  }
+
+  populate_work_queue(task->input_file, task->wq, task->nr_frames);
+
+  /*
+   * Rest of the work in Main thread!
+   */
+  if (task_segmenter_queue(task) != (void *)0) {
+    LOG_ERR("Main segmenter task failed");
+  }
+
+  /*
+   * Wait for all worker threads!
+   */
+  for (int i = 0; i < task->nr_tasks - 1; i++) {
+    long long ret_val = 0;
+    pthread_join(thrs[i], (void *)ret_val);
+    if (ret_val != 0) {
+      LOG_ERR("Thread %d failed!", i);
+      goto err;
+    }
+  }
+  return 0;
+err:
+  return -1;
+}
+
 /*
  * Performs segmentation of nr_frames images.
  *
@@ -40,13 +206,12 @@ static int filepath(int padding, int num, char *prefix, char *ext, char *path);
  * thread.
  */ 
 int
-dispatch_segmenter_tasks(segment_task_t *task)
+dispatch_segmenter_tasks_static(segment_task_t *task)
 {
   int i = 0;
   pthread_t thrs[TASKS_MAX];
   int frames_per_thread;
   int spilled_tasks, prev_start, prev_nr_frames;
-  bool reports_alloced = false;
   segment_task_t main_task = { 0 };
   segment_task_t thr_tasks[TASKS_MAX];
 
@@ -61,7 +226,6 @@ dispatch_segmenter_tasks(segment_task_t *task)
       LOG_ERR("Failed to allocate reports!");
       return -1;
     }
-    reports_alloced = true;
   }
 
   /*
@@ -120,9 +284,20 @@ dispatch_segmenter_tasks(segment_task_t *task)
   return 0;
 
 err:
-  if (reports_alloced && task->reports)
-    free(task->reports);
   return -1;
+}
+
+int
+dispatch_segmenter_tasks(segment_task_t *task)
+{
+  int ret = 0;
+  if (task->static_job_alloc) {
+    ret = dispatch_segmenter_tasks_static(task);
+  } else {
+    ret = dispatch_segmenter_tasks_wq(task);
+  }
+
+  return ret;
 }
 
 /*
@@ -148,12 +323,12 @@ task_segmenter(void *data)
       break;
     }
     if (i == task->start) {
-      if (segdata_init(task, file_path, &segdata) < 0) {
+      if (segdata_init(task, file_path, &segdata, -1, -1) < 0) {
         LOG_ERR("Failed to initialize segdata");
         break;
       }
     } else {
-      if (segdata_reset(&segdata, file_path) < 0) {
+      if (segdata_reset(&segdata, file_path, -1, -1) < 0) {
         LOG_ERR("Failed to reset segdata");
         break;
       }
@@ -177,7 +352,7 @@ task_segmenter(void *data)
  */
 
 int
-segdata_init(segment_task_t *args, char *filename, segdata_t *segdata)
+segdata_init(segment_task_t *args, char *filename, segdata_t *segdata, int x, int y)
 {
   size_t imgbuf_sz;
   unsigned char *imgbuf;
@@ -195,7 +370,7 @@ segdata_init(segment_task_t *args, char *filename, segdata_t *segdata)
   bzero(segdata, sizeof(segdata_t));
   segdata->debug_imgs = args->debug_imgs;
 
-  if (segdata_reset(segdata, filename) < 0)
+  if (segdata_reset(segdata, filename, x, y) < 0)
     goto err;
 
   /*
@@ -255,7 +430,7 @@ void segdata_fini(segdata_t *segdata)
 }
 
 int
-segdata_reset(segdata_t *segdata, char *filename)
+segdata_reset(segdata_t *segdata, char *filename, int x, int y)
 {
   char *fname = NULL;
   DEFINE_PROFILE_VARS
@@ -321,6 +496,11 @@ segdata_reset(segdata_t *segdata, char *filename)
     LOG_ERR("Failed to construct threshold_filename!");
     goto err;
   }
+
+  if (x >= 0)
+    segdata->centroid_x = x;
+  if (y >= 0)
+    segdata->centroid_y = y;
 
   return 0;
 err:

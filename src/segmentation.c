@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <strings.h>
 
+#include "work_queue.h"
 #include "segmenter.h"
 #include "log.h"
 #include "segmentation.h"

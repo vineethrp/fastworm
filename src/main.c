@@ -10,6 +10,7 @@
 
 #include "log.h"
 #include "argparser.h"
+#include "work_queue.h"
 #include "segmenter.h"
 
 /*
@@ -52,6 +53,9 @@ main(int argc, char **argv)
   } else {
     ret = -1;
   }
+
+  if (task.reports != NULL)
+    free(task.reports);
 
   log_fini();
 
