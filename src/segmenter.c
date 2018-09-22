@@ -34,6 +34,35 @@ static int write_threshold(char *filename,
 static int filepath(int padding, int num, char *prefix, char *ext, char *path);
 
 int
+segment_task_init(int argc, char **argv, segment_task_t *task)
+{
+  if (parse_arguments(argc, argv, task) < 0) {
+    fprintf(stderr, "Failed to parse arguments\n");
+    return -1;
+  }
+
+  if (task->nr_frames < task->nr_tasks)
+    task->nr_tasks = task->nr_frames;
+
+  if (task->reports == NULL) {
+    task->reports = (report_t *) calloc(task->nr_frames, sizeof(report_t));
+    if (task->reports == NULL) {
+      LOG_ERR("Failed to allocate reports!");
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
+void
+segment_task_fini(segment_task_t *task)
+{
+  if (task->reports != NULL)
+    free(task->reports);
+}
+
+int
 populate_work_queue(char *input_file, wq_t *wq, int nr_frames)
 {
   int ret = -1;
@@ -142,17 +171,6 @@ task_segmenter_queue(void *data)
 int
 dispatch_segmenter_tasks_wq(segment_task_t *task)
 {
-  if (task->nr_frames < task->nr_tasks)
-    task->nr_tasks = task->nr_frames;
-
-  if (task->reports == NULL) {
-    task->reports = (report_t *) calloc(task->nr_frames, sizeof(report_t));
-    if (task->reports == NULL) {
-      LOG_ERR("Failed to allocate reports!");
-      return -1;
-    }
-  }
-
   task->wq = wq_init(WORK_QUEUE_DEFAULT_CAP);
   if (task->wq == NULL) {
     LOG_ERR("Failed to initialize the work queue");

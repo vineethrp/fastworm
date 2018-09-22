@@ -104,6 +104,9 @@ typedef struct segdata_s {
   int area;
 } segdata_t;
 
+int segment_task_init(int argc, char **argv, segment_task_t *task);
+void segment_task_fini(segment_task_t *task);
+
 int segdata_init(segment_task_t *args, char *filename,
                   segdata_t *segdata, int x, int y);
 int segdata_reset(segdata_t *segdata, char *filename, int x, int y);

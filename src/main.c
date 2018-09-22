@@ -20,25 +20,25 @@
 int
 main(int argc, char **argv)
 {
-  int ret = 0;
+  int ret = -1;
   char file_path[PATH_MAX + NAME_MAX];
   segment_task_t task = { 0 };
 
-  if (parse_arguments(argc, argv, &task) < 0) {
-    fprintf(stderr, "Failed to parse arguments\n");
-    exit(1);
+  if (segment_task_init(argc, argv, &task) < 0) {
+    fprintf(stderr, "Failed to initialize\n");
+    return ret;
   }
 
   // create output directory
   errno = 0;
   if (mkdir(task.output_dir, 0750) < 0 && errno != EEXIST) {
     fprintf(stderr, "Failed to create the output directory!\n");
-    exit(1);
+    goto out;
   }
 
   snprintf(file_path, PATH_MAX + NAME_MAX, "%s/%s", task.output_dir, task.logfile);
   if (log_init(task.verbosity, 0, file_path) < 0) {
-    exit (1);
+    goto out;
   }
 
   LOG_INFO("Starting Segmenter");
@@ -50,12 +50,12 @@ main(int argc, char **argv)
      */
     snprintf(file_path, PATH_MAX + NAME_MAX, "%s/%s", task.output_dir, task.outfile);
     write_output(file_path, task.reports, task.nr_frames);
-  } else {
-    ret = -1;
   }
 
-  if (task.reports != NULL)
-    free(task.reports);
+  ret = 0;
+
+out:
+  segment_task_fini(&task);
 
   log_fini();
 
