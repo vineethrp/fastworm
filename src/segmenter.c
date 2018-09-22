@@ -31,7 +31,6 @@
 
 static int write_threshold(char *filename,
     bool *threshold_data, unsigned char *data, int w, int h);
-static int filepath(int padding, int num, char *prefix, char *ext, char *path);
 
 int
 segment_task_init(int argc, char **argv, segment_task_t *task)
@@ -63,56 +62,24 @@ segment_task_fini(segment_task_t *task)
 }
 
 int
-populate_work_queue(char *input_file, wq_t *wq, int nr_frames)
+populate_work_queue(void *data, work_t w, bool last)
 {
-  int ret = -1;
-  FILE *fp = NULL;
+  wq_t *wq = (wq_t *)data;
 
-  if (input_file == NULL || wq == NULL) {
-    LOG_ERR("Invalid arguements to populate_work_queue");
-    goto out;
+  if (last) {
+    wq_mark_done(wq);
+    return 0;
   }
 
-  fp = fopen(input_file, "r");
-  if (fp == NULL) {
-    LOG_ERR("Failed to open the input file: %s(%s)",
-        strerror(errno), input_file);
-    goto out;
+  if (wq == NULL)
+    return -1;
+
+  if (wq_push_work(wq, w) != 1) {
+    LOG_ERR("Failed to push the work into queue");
+    return -1;
   }
 
-  char frame_str[16];
-  unsigned long ts;
-  int x, y, f, count = 0;
-  while (fscanf(fp, "%s %lu %d %d %d\n", frame_str, &ts, &x, &y, &f) != EOF) {
-    errno = 0;
-    long frame = strtol(frame_str, NULL, 10);
-    if (errno != 0) {
-      LOG_ERR("Failed to convert the frame number from input file: %s", frame_str);
-      goto out;
-    }
-
-    int padding = strlen(frame_str);
-    work_t w = { 0 };
-    w.frame = frame;
-    w.padding = padding;
-    w.centroid_x = x;
-    w.centroid_y = y;
-    if (wq_push_work(wq, w) != 1) {
-      LOG_ERR("Failed to push the work into queue");
-      goto out;
-    }
-    count++;
-    if (count == nr_frames)
-      break;
-  }
-
-  ret = 0;
-
-out:
-  if (fp != NULL)
-    fclose(fp);
-  wq_mark_done(wq);
-  return ret;
+  return 0;
 }
 
 void *
@@ -169,6 +136,65 @@ task_segmenter_queue(void *data)
 }
 
 int
+process_infile(char *input_file, process_infile_cb_t cb, void *data, int nr_frames)
+{
+  int ret = -1;
+  FILE *fp = NULL;
+
+  if (input_file == NULL) {
+    LOG_ERR("Invalid arguements to populate_work_queue");
+    goto out;
+  }
+
+  fp = fopen(input_file, "r");
+  if (fp == NULL) {
+    LOG_ERR("Failed to open the input file: %s(%s)",
+        strerror(errno), input_file);
+    goto out;
+  }
+
+  char frame_str[16];
+  unsigned long ts;
+  int x, y, f, count = 0;
+  work_t w = { 0 };
+  while (fscanf(fp, "%s %lu %d %d %d\n", frame_str, &ts, &x, &y, &f) != EOF) {
+    long frame;
+    int padding;
+
+    errno = 0;
+    frame = strtol(frame_str, NULL, 10);
+    if (errno != 0) {
+      LOG_ERR("Failed to convert the frame number from input file: %s", frame_str);
+      goto out;
+    }
+
+    padding = strlen(frame_str);
+    w.frame = frame;
+    w.padding = padding;
+    w.centroid_x = x;
+    w.centroid_y = y;
+
+    if (cb(data, w, false) < 0) {
+      LOG_ERR("process_infile callback failed");
+      goto out;
+    }
+
+    count++;
+    if (count == nr_frames)
+      break;
+  }
+
+  cb(data, w, true);
+
+  ret = 0;
+
+out:
+  if (fp != NULL)
+    fclose(fp);
+  return ret;
+}
+
+int
 dispatch_segmenter_tasks_wq(segment_task_t *task)
 {
   task->wq = wq_init(WORK_QUEUE_DEFAULT_CAP);
@@ -191,7 +217,8 @@ dispatch_segmenter_tasks_wq(segment_task_t *task)
     }
   }
 
-  populate_work_queue(task->input_file, task->wq, task->nr_frames);
+  process_infile(task->input_file, populate_work_queue,
+                  (void *)(task->wq), task->nr_frames);
 
   /*
    * Rest of the work in Main thread!
@@ -643,7 +670,7 @@ write_threshold(char *filename, bool *threshold_data,
   return 0;
 }
 
-static int
+int
 filepath(int padding, int num, char *prefix, char *ext, char *path)
 {
   char format[NAME_MAX];

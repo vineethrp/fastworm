@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <pthread.h>
+
 #include "log.h"
 #include "argparser.h"
 #include "work_queue.h"
