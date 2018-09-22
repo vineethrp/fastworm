@@ -7,8 +7,6 @@ typedef struct work_s {
   int padding;
   int centroid_x;
   int centroid_y;
-  int area;
-  char path[PATH_MAX];
 } work_t;
 
 typedef struct wq_s {
