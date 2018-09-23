@@ -26,7 +26,7 @@ main(int argc, char **argv)
   char file_path[PATH_MAX + NAME_MAX];
   segment_task_t task = { 0 };
 
-  if (segment_task_init(argc, argv, &task) < 0) {
+  if (segment_task_init(argc, argv, &task, true) < 0) {
     fprintf(stderr, "Failed to initialize\n");
     return ret;
   }

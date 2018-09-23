@@ -106,7 +106,7 @@ typedef struct segdata_s {
 
 int filepath(int padding, int num, char *prefix, char *ext, char *path);
 
-int segment_task_init(int argc, char **argv, segment_task_t *task);
+int segment_task_init(int argc, char **argv, segment_task_t *task, bool alloc_reports);
 void segment_task_fini(segment_task_t *task);
 
 typedef int (*process_infile_cb_t)(void *, work_t w, bool last);

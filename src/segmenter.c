@@ -33,7 +33,7 @@ static int write_threshold(char *filename,
     bool *threshold_data, unsigned char *data, int w, int h);
 
 int
-segment_task_init(int argc, char **argv, segment_task_t *task)
+segment_task_init(int argc, char **argv, segment_task_t *task, bool alloc_reports)
 {
   if (parse_arguments(argc, argv, task) < 0) {
     fprintf(stderr, "Failed to parse arguments\n");
@@ -43,7 +43,7 @@ segment_task_init(int argc, char **argv, segment_task_t *task)
   if (task->nr_frames < task->nr_tasks)
     task->nr_tasks = task->nr_frames;
 
-  if (task->reports == NULL) {
+  if (task->reports == NULL && alloc_reports) {
     task->reports = (report_t *) calloc(task->nr_frames, sizeof(report_t));
     if (task->reports == NULL) {
       LOG_ERR("Failed to allocate reports!");
