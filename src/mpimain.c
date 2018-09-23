@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "work_queue.h"
 #include "segmenter.h"
 #include "argparser.h"
 #include "log.h"
@@ -32,22 +33,10 @@ main(int argc, char *argv[])
 {
   MPI_Datatype report_type;
   int  nr_tasks, taskid, len;
-  int  ret = 0;
+  int  ret = -1;
   char hostname[MPI_MAX_PROCESSOR_NAME];
   char logfile[PATH_MAX];
   segment_task_t task = { 0 };
-
-  if (parse_arguments(argc, argv, &task) < 0) {
-    fprintf(stderr, "Failed to parse arguments\n");
-    exit(1);
-  }
-
-  // create output directory
-  errno = 0;
-  if (mkdir(task.output_dir, 0750) < 0 && errno != EEXIST) {
-    fprintf(stderr, "Failed to create the output directory!\n");
-    exit(1);
-  }
 
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &nr_tasks);
@@ -56,9 +45,20 @@ main(int argc, char *argv[])
 
   MPI_Report_Struct_Type(&report_type);
 
+  if (segment_task_init(argc, argv, &task, taskid == TASK_MASTER) < 0) {
+    fprintf(stderr, "Failed to parse arguments\n");
+    return -1;
+  }
+
+  // create output directory
+  errno = 0;
+  if (mkdir(task.output_dir, 0750) < 0 && errno != EEXIST) {
+    fprintf(stderr, "Failed to create the output directory!\n");
+    goto out;
+  }
+
   sprintf(logfile, "%s/task-%d_%s", task.output_dir, taskid, task.logfile);
   if (log_init(task.verbosity, 0, logfile) < 0) {
-    ret = -1;
     goto out;
   }
 
@@ -69,8 +69,10 @@ main(int argc, char *argv[])
     ret = mpi_slave(taskid, &task, &report_type);
   }
 
-  log_fini();
+  ret = 0;
 out:
+  log_fini();
+  segment_task_fini(&task);
   MPI_Finalize();
   return ret;
 }
@@ -159,7 +161,7 @@ mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
   task->nr_frames = frames_per_task;
   LOG_XX_DEBUG("MPI master task details: start_frame=%d, nr_frames=%di, nr_tasks=%d",
       task->start, task->nr_frames, task->nr_tasks);
-  dispatch_segmenter_tasks(task);
+  dispatch_segmenter_tasks_static(task);
 
   // Receive the job output.
   for (int i = 1; i < nr_tasks; i++) {
@@ -194,7 +196,7 @@ mpi_slave(int taskid, segment_task_t *task, MPI_Datatype *report_type)
     LOG_ERR("Failed to allocate reports!");
     return -1;
   }
-  dispatch_segmenter_tasks(task);
+  dispatch_segmenter_tasks_static(task);
 
   output[0] = 0;
   output[1] = task->base;
