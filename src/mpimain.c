@@ -17,12 +17,16 @@
 #define TAG_OUTPUT 1
 #define TAG_REPORT 1
 
-int MPI_Report_Struct_Type(MPI_Datatype *output_type);
 int mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type);
 int mpi_slave(int taskid, segment_task_t *task, MPI_Datatype *report_type);
 
-static int input[2]; // { starting_frame, nr_frames }
-static int output[3]; // { status, starting_frame, nr_frames }
+typedef struct output_s {
+  int status;
+  report_t report;
+} output_t;
+
+static work_t input; // { frame_id, padding, x, y }
+static output_t output; // { status, frame_id, x, y, area }
 
 /*
  * Entry point for msegmenter.
@@ -43,8 +47,6 @@ main(int argc, char *argv[])
   MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
   MPI_Get_processor_name(hostname, &len);
 
-  MPI_Report_Struct_Type(&report_type);
-
   if (segment_task_init(argc, argv, &task, taskid == TASK_MASTER) < 0) {
     fprintf(stderr, "Failed to parse arguments\n");
     return -1;
@@ -62,6 +64,9 @@ main(int argc, char *argv[])
     goto out;
   }
 
+  // Override nr_tasks from MPI
+  task.nr_tasks = nr_tasks;
+
   LOG_INFO("Starting Segmenter");
   if (taskid == TASK_MASTER) {
     ret = mpi_master(&task, nr_tasks, &report_type);
@@ -78,21 +83,43 @@ out:
 }
 
 int
-MPI_Report_Struct_Type(MPI_Datatype *report_type)
+mpi_master_distribute(void *data, work_t w, bool last)
 {
-  MPI_Datatype report_struct;
-  MPI_Datatype type[4] = { MPI_INT, MPI_INT, MPI_INT, MPI_INT };
-  int blocklen[4] = {1, 1, 1, 1}; 
-  MPI_Aint disp[4];
+  MPI_Status status;
+  segment_task_t *task = (segment_task_t *)data;
 
-  disp[0] = offsetof(report_t, frame_id);
-  disp[1] = offsetof(report_t, centroid_x);
-  disp[2] = offsetof(report_t, centroid_y);
-  disp[3] = offsetof(report_t, area);
+  if (task == NULL) {
+    return -1;
+  }
 
-  MPI_Type_create_struct(4, blocklen, disp, type, &report_struct);
-  MPI_Type_create_resized(report_struct, 0, sizeof(report_t), report_type);
-  MPI_Type_commit(report_type);
+  if (last) {
+    input.frame = -1;
+    for (int i = 0; i < task->nr_tasks - 1; i++) {
+      MPI_Recv(&output, 5, MPI_INT, MPI_ANY_SOURCE, TAG_OUTPUT, MPI_COMM_WORLD, &status);
+      if (output.status <= 0) {
+        task->reports[output.report.frame_id] = output.report;
+      }
+      MPI_Send(&input, 4, MPI_INT, status.MPI_SOURCE, TAG_INPUT, MPI_COMM_WORLD);
+    }
+    return 0;
+  }
+
+  // Receive request/result and send new job
+  MPI_Recv(&output, 5, MPI_INT, MPI_ANY_SOURCE, TAG_OUTPUT, MPI_COMM_WORLD, &status);
+  LOG_XX_DEBUG("MPI Receiving from slave %d: status=%d, frame_id=%d, x=%d, y=%d, area=%d",
+        status.MPI_SOURCE, output.status, output.report.frame_id,
+        output.report.centroid_x, output.report.centroid_y, output.report.area);
+
+  // Status = 0 -> Segmentation Success
+  // Status < 0 -> Segmentation Failure
+  // Status = 1 -> No result, just asking for new job.
+  if (output.status <= 0) {
+        task->reports[output.report.frame_id] = output.report;
+  }
+
+  input = w;
+
+  MPI_Send(&input, 4, MPI_INT, status.MPI_SOURCE, TAG_INPUT, MPI_COMM_WORLD);
 
   return 0;
 }
@@ -100,12 +127,7 @@ MPI_Report_Struct_Type(MPI_Datatype *report_type)
 int
 mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
 {
-  MPI_Status status;
   char file_path[PATH_MAX];
-  int next_frame = 0;
-  int frames_per_task;
-  int spilled_frames;
-  int actual_nr_frames;
 
   if (task == NULL) {
     LOG_ERR("Invalid task structure");
@@ -113,68 +135,16 @@ mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
   }
 
   LOG_INFO("MPI master task starting");
-  actual_nr_frames = task->nr_frames;
-  task->reports = (report_t *) calloc(actual_nr_frames, sizeof(report_t));
-  if (task->reports == NULL) {
-    LOG_ERR("Failed to allocate reports!");
-    return -1;
-  }
 
   if (task->nr_frames < nr_tasks)
     nr_tasks = task->nr_frames;
 
-  frames_per_task = task->nr_frames / nr_tasks;
-  spilled_frames = task->nr_frames % nr_tasks;
-  LOG_XX_DEBUG("nr_tasks=%d, frames_per_task=%d, spilled_frames=%d, nr_frames=%d",
-      nr_tasks, frames_per_task, spilled_frames, task->nr_frames);
-
-  /*
-   * Master task takes first frames_per_task frames to process
-   * So first slave's starting frame_is is frames_per_task.
-   */
-  next_frame = frames_per_task;
-
-  /*
-   * If there are are more frames after dividing equally, we share
-   * the load by one more each to the slave tasks.
-   */
-  if (spilled_frames)
-    frames_per_task++;
-
-  // Send Job details to slaves.
-  for (int i = 1; i < nr_tasks; i++) {
-    input[0] = next_frame;
-    input[1] = frames_per_task;
-
-    LOG_XX_DEBUG("MPI Sending task to slave %d: start_frame=%d, nr_tasks=%d",
-        i, next_frame, frames_per_task);
-
-    next_frame += frames_per_task;
-    spilled_frames--;
-    if (spilled_frames == 0)
-      frames_per_task--;
-    MPI_Send(input, 2, MPI_INT, i, TAG_INPUT, MPI_COMM_WORLD);
-  }
-
-  // Master's piece of the task.
-  task->base = task->start = 0;
-  task->nr_frames = frames_per_task;
-  LOG_XX_DEBUG("MPI master task details: start_frame=%d, nr_frames=%di, nr_tasks=%d",
-      task->start, task->nr_frames, task->nr_tasks);
-  dispatch_segmenter_tasks_static(task);
-
-  // Receive the job output.
-  for (int i = 1; i < nr_tasks; i++) {
-    MPI_Recv(output, 3, MPI_INT, i, TAG_OUTPUT, MPI_COMM_WORLD, &status);
-    LOG_XX_DEBUG("MPI Receiving result from slave %d: status=%d, start_frame=%d, nr_frames=%d",
-        i, output[0], output[1], output[2]);
-
-    MPI_Recv(task->reports + output[1], output[2], *report_type, i, TAG_REPORT, MPI_COMM_WORLD, &status);
-  }
+  process_infile(task->input_file, mpi_master_distribute,
+                  (void *)task, task->nr_frames);
 
   LOG_XX_DEBUG("MPI Master writing output file!");
   sprintf(file_path, "%s/%s", task->output_dir, task->outfile);
-  write_output(file_path, task->reports, actual_nr_frames);
+  write_output(file_path, task->reports, task->nr_frames);
   return 0;
 }
 
@@ -182,27 +152,53 @@ int
 mpi_slave(int taskid, segment_task_t *task, MPI_Datatype *report_type)
 {
   MPI_Status status;
+  char file_path[PATH_MAX];
+  bool need_segdata_init = true;
+  segdata_t segdata = { 0 };
 
   LOG_INFO("MPI slave %d starting..", taskid);
-  MPI_Recv(input, 2, MPI_INT, TASK_MASTER, TAG_INPUT, MPI_COMM_WORLD, &status);
+  // Set status to 1 fro first job.
+  output.status = 1;
+  while (1) {
+    int ret = 0;
+    // Send request to master
+    MPI_Send(&output, 5, MPI_INT, TASK_MASTER, TAG_OUTPUT, MPI_COMM_WORLD);
 
-  task->base = task->start = input[0];
-  task->nr_frames = input[1];
-  LOG_XX_DEBUG("MPI slave %d: start_frame=%d, nr_frames=%d, nr_tasks=%d",
-      taskid, input[0], input[1], task->nr_tasks);
+    // Recv job
+    MPI_Recv(&input, 4, MPI_INT, TASK_MASTER, TAG_INPUT, MPI_COMM_WORLD, &status);
 
-  task->reports = (report_t *) calloc(task->nr_frames, sizeof(report_t));
-  if (task->reports == NULL) {
-    LOG_ERR("Failed to allocate reports!");
-    return -1;
+    if (input.frame < 0) {
+      // Master signalled end.
+      LOG_INFO("(SLave %d): Master send FINI", taskid);
+      break;
+    }
+
+    if (filepath(input.padding, input.frame, task->input_dir, task->ext, file_path) < 0) {
+      LOG_ERR("Failed to create filepath!");
+      break;
+    }
+    if (need_segdata_init) {
+      if (segdata_init(task, file_path, &segdata, input.centroid_x, input.centroid_y) < 0) {
+        LOG_ERR("Failed to initialize segdata");
+        ret = -1;
+      }
+      need_segdata_init = false;
+    } else {
+      if (segdata_reset(&segdata, file_path, input.centroid_x, input.centroid_y) < 0) {
+        LOG_ERR("Failed to reset segdata");
+        ret = -1;
+      }
+    }
+
+    if (ret == 0) {
+      segdata_process(&segdata);
+    }
+    output.status = ret;
+    output.report.frame_id = input.frame;
+    output.report.centroid_x =  segdata.centroid_x;
+    output.report.centroid_y =  segdata.centroid_y;
+    output.report.area =  segdata.area;
   }
-  dispatch_segmenter_tasks_static(task);
-
-  output[0] = 0;
-  output[1] = task->base;
-  output[2] = task->nr_frames;
-  MPI_Send(output, 3, MPI_INT, TASK_MASTER, TAG_OUTPUT, MPI_COMM_WORLD);
-  MPI_Send(task->reports, task->nr_frames, *report_type, TASK_MASTER, TAG_REPORT, MPI_COMM_WORLD);
 
   return 0;
 }
