@@ -82,18 +82,51 @@ populate_work_queue(void *data, work_t w, bool last)
   return 0;
 }
 
+int
+segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
+              bool init_segdata, report_t *report)
+{
+  char file_path[PATH_MAX];
+
+  report->frame_id = w.frame;
+
+  if (filepath(w.padding, w.frame, task->input_dir, task->ext, file_path) < 0) {
+    LOG_ERR("Failed to create filepath!");
+    return -1;
+  }
+  if (init_segdata) {
+    if (segdata_init(task, file_path, segdata, w.centroid_x, w.centroid_y) < 0) {
+      LOG_ERR("Failed to initialize segdata");
+      return -1;
+    }
+  } else {
+    if (segdata_reset(segdata, file_path, w.centroid_x, w.centroid_y) < 0) {
+      LOG_ERR("Failed to reset segdata");
+      return -1;
+    }
+  }
+
+  segdata_process(segdata);
+
+  report->centroid_x = segdata->centroid_x;
+  report->centroid_y = segdata->centroid_y;
+  report->area = segdata->area;
+
+  return 0;
+}
+
 void *
 task_segmenter_queue(void *data)
 {
   int ret = -1;
-  char file_path[PATH_MAX];
-  bool need_segdata_init = true;
+  bool init_segdata = true;
   segment_task_t *task = NULL;
   segdata_t segdata = { 0 };
 
   task = (segment_task_t *)data;
 
   while (true) {
+    ret = -1;
 
     work_t w = { 0 };
     ret = wq_pop_work(task->wq, &w);
@@ -105,29 +138,14 @@ task_segmenter_queue(void *data)
       break;
     }
 
-    if (filepath(w.padding, w.frame, task->input_dir, task->ext, file_path) < 0) {
-      LOG_ERR("Failed to create filepath!");
+    if (segment_frame(task, w, &segdata, init_segdata,
+          &task->reports[w.frame]) < 0) {
+      LOG_ERR("Failed to segment the frame");
       break;
     }
-    if (need_segdata_init) {
-      if (segdata_init(task, file_path, &segdata, w.centroid_x, w.centroid_y) < 0) {
-        LOG_ERR("Failed to initialize segdata");
-        break;
-      }
-      need_segdata_init = false;
-    } else {
-      if (segdata_reset(&segdata, file_path, w.centroid_x, w.centroid_y) < 0) {
-        LOG_ERR("Failed to reset segdata");
-        break;
-      }
-    }
+    if (init_segdata)
+      init_segdata = false;
 
-    segdata_process(&segdata);
-
-    task->reports[w.frame].frame_id = w.frame;
-    task->reports[w.frame].centroid_x = segdata.centroid_x;
-    task->reports[w.frame].centroid_y = segdata.centroid_y;
-    task->reports[w.frame].area = segdata.area;
     ret = 0;
   }
 

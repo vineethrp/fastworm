@@ -20,13 +20,9 @@ int validate_options(prog_args_t *prog_args);
 int parse_options(int key, char *arg, struct argp_state *state);
 
 struct argp_option options[] = {
-  {"project",           'P', "NAME",      0, "The name of the project to process."},
   {"input-dir",         'i', "PATH",      0, "Path to input images."},
-  {"input-file",        'I', "PATH",      0, "Path to input log file."},
   {"output-dir",        'o', "PATH",      0, "Output file path."},
-  {"output-file",       'O', "FILE NAME", 0, "Output file path."},
   {"padding",           'p', "NUMBER",    0, "Number of digits in the file name."},
-  {"frames",            'f', "FRAMES",    0, "Number of frames to be processed."},
   {"extension",         'e', "STRING",    0, "Extension of the image files."},
   {"minarea",           'a', "NUMBER",    0, "The lower bound for a candidate worm component."},
   {"maxarea",           'A', "NUMBER",    0, "The upper bound for a candidate worm component."},
@@ -34,11 +30,17 @@ struct argp_option options[] = {
   {"blur-winsz",        'b', "NUMBER",    0, "Width and height of the sliding window in the box blur."},
   {"thresh-winsz",      't', "NUMBER",    0, "Width and height of the sliding window in the dynamic threshold."},
   {"thresh-ratio",      'T', "FLOAT",     0, "Pixel intensity."},
-  {"jobs",              'j', "NUMBER",    0, "Number of concurrent jobs(threads) to run locally"},
-  {"static-job-alloc",  's', 0,           0, "Static job allocation to worker threads."},
   {"logfile",           'l', "FILE NAME", 0, "Path to log file."},
   {"verbose",           'v', 0,           0, "Produce verbose output."},
   {"debug",             'd', 0,           0, "Enable creation of debug images"},
+#ifndef SINGLE_FRAME
+  {"input-file",        'I', "PATH",      0, "Path to input log file."},
+  {"output-file",       'O', "FILE NAME", 0, "Output file path."},
+  {"frames",            'f', "FRAMES",    0, "Number of frames to be processed."},
+  {"jobs",              'j', "NUMBER",    0, "Number of concurrent jobs(threads) to run locally"},
+  {"project",           'P', "NAME",      0, "The name of the project to process."},
+  {"static-job-alloc",  's', 0,           0, "Static job allocation to worker threads."},
+#endif
   { 0 }
 };
 
@@ -63,29 +65,34 @@ parse_options(int key, char *arg, struct argp_state *state)
   prog_args_t *prog_args = (prog_args_t *)state->input;
 
   switch (key) {
+#ifndef SINGLE_FRAME
     case 'P':
       strcpy(prog_args->project, arg);
-      break;
-    case 'i':
-      strcpy(prog_args->input_dir, arg);
       break;
     case 'I':
       strcpy(prog_args->input_file, arg);
       break;
-    case 'o':
-      strcpy(prog_args->output_dir, arg);
-      break;
     case 'O':
       strcpy(prog_args->outfile, arg);
-      break;
-    case 'p':
-      prog_args->padding = atoi(arg);
       break;
     case 'f':
       prog_args->nr_frames = atoi(arg);
       break;
     case 's':
       prog_args->static_job_alloc = true;
+      break;
+    case 'j':
+      prog_args->nr_tasks = atoi(arg);
+      break;
+#endif
+    case 'i':
+      strcpy(prog_args->input_dir, arg);
+      break;
+    case 'o':
+      strcpy(prog_args->output_dir, arg);
+      break;
+    case 'p':
+      prog_args->padding = atoi(arg);
       break;
     case 'e':
       strcpy(prog_args->ext, arg);
@@ -107,9 +114,6 @@ parse_options(int key, char *arg, struct argp_state *state)
       break;
     case 'T':
       prog_args->thresh_ratio = atof(arg);
-      break;
-    case 'j':
-      prog_args->nr_tasks = atoi(arg);
       break;
     case 'l':
       strcpy(prog_args->logfile, arg);
@@ -139,16 +143,26 @@ validate_options(prog_args_t *prog_args)
     strcpy(prog_args->project, PROGS_ARGS_DEFAULT_PROJECT);
   }
 
+  if (prog_args->outfile[0] == 0) {
+    strcpy(prog_args->outfile, PROG_ARGS_DEFAULT_OUTPUT_FILE);
+  }
+
+  if (prog_args->nr_tasks == 0)
+    prog_args->nr_tasks = sysconf(_SC_NPROCESSORS_ONLN);
+  if (prog_args->nr_tasks > TASKS_MAX)
+    prog_args->nr_tasks = TASKS_MAX;
+
+  if (prog_args->nr_frames == 0) {
+    fprintf(stderr, "mandatory option -f either not specified or invalid value\n");
+    return -1;
+  }
+
   if (prog_args->input_dir[0] == 0) {
     strcpy(prog_args->input_dir, PROG_ARGS_DEFAULT_INPUT_DIR);
   }
 
   if (prog_args->output_dir[0] == 0) {
     strcpy(prog_args->output_dir, PROG_ARGS_DEFAULT_OUTPUT_DIR);
-  }
-
-  if (prog_args->outfile[0] == 0) {
-    strcpy(prog_args->outfile, PROG_ARGS_DEFAULT_OUTPUT_FILE);
   }
 
   if (prog_args->ext[0] == 0) {
@@ -187,20 +201,11 @@ validate_options(prog_args_t *prog_args)
     prog_args->thresh_ratio = PROG_ARGS_DEFAULT_THRESH_RATIO;
   }
 
-  if (prog_args->nr_tasks == 0)
-    prog_args->nr_tasks = sysconf(_SC_NPROCESSORS_ONLN);
-  if (prog_args->nr_tasks > TASKS_MAX)
-    prog_args->nr_tasks = TASKS_MAX;
-
-  if (prog_args < LOG_ERR) {
+  if (prog_args->verbosity < LOG_ERR) {
     prog_args->verbosity = LOG_INFO;
   }
 
-  if (prog_args->nr_frames == 0) {
-    fprintf(stderr, "mandatory option -f either not specified or invalid value\n");
-    return -1;
-  }
-
+#ifndef SINGLE_FRAME
   if (prog_args->verbosity > LOG_INFO) {
     fprintf(stdout, "Program options:\n");
     fprintf(stdout, "Project: %s, Input dir: %s, Output dir: %s, frames: %d\n",
@@ -220,6 +225,7 @@ validate_options(prog_args_t *prog_args)
     fprintf(stdout, "debug_imgs: %d, verbosity: %d\n",
         prog_args->debug_imgs, prog_args->verbosity);
   }
+#endif
 
   return 0;
 }
