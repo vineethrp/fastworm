@@ -33,7 +33,11 @@ struct argp_option options[] = {
   {"logfile",           'l', "FILE NAME", 0, "Path to log file."},
   {"verbose",           'v', 0,           0, "Produce verbose output."},
   {"debug",             'd', 0,           0, "Enable creation of debug images"},
-#ifndef SINGLE_FRAME
+#ifdef SINGLE_FRAME
+  {"frame number",      'f',  "NUMBER",    0, "Frame number"},
+  {"centroid-x",        'x', "NUMBER",    0, "Centroid x value"},
+  {"centroid-y",        'y', "NUMBER",    0, "Centroid y value"},
+#else
   {"input-file",        'I', "PATH",      0, "Path to input log file."},
   {"output-file",       'O', "FILE NAME", 0, "Output file path."},
   {"frames",            'f', "FRAMES",    0, "Number of frames to be processed."},
@@ -75,16 +79,27 @@ parse_options(int key, char *arg, struct argp_state *state)
     case 'O':
       strcpy(prog_args->outfile, arg);
       break;
-    case 'f':
-      prog_args->nr_frames = atoi(arg);
-      break;
     case 's':
       prog_args->static_job_alloc = true;
       break;
     case 'j':
       prog_args->nr_tasks = atoi(arg);
       break;
+#else
+    case 'x':
+      prog_args->centroid_x = atoi(arg);
+      break;
+    case 'y':
+      prog_args->centroid_y = atoi(arg);
+      break;
 #endif
+    case 'f':
+#ifdef SINGLE_FRAME
+      prog_args->frame = atoi(arg);
+#else
+      prog_args->nr_frames = atoi(arg);
+#endif
+      break;
     case 'i':
       strcpy(prog_args->input_dir, arg);
       break;
@@ -139,12 +154,9 @@ init_options(prog_args_t *prog_args)
 int
 validate_options(prog_args_t *prog_args)
 {
+#ifndef SINGLE_FRAME
   if (prog_args->project[0] == 0) {
     strcpy(prog_args->project, PROGS_ARGS_DEFAULT_PROJECT);
-  }
-
-  if (prog_args->outfile[0] == 0) {
-    strcpy(prog_args->outfile, PROG_ARGS_DEFAULT_OUTPUT_FILE);
   }
 
   if (prog_args->nr_tasks == 0)
@@ -155,6 +167,11 @@ validate_options(prog_args_t *prog_args)
   if (prog_args->nr_frames == 0) {
     fprintf(stderr, "mandatory option -f either not specified or invalid value\n");
     return -1;
+  }
+#endif
+
+  if (prog_args->outfile[0] == 0) {
+    strcpy(prog_args->outfile, PROG_ARGS_DEFAULT_OUTPUT_FILE);
   }
 
   if (prog_args->input_dir[0] == 0) {

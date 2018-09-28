@@ -40,6 +40,7 @@ segment_task_init(int argc, char **argv, segment_task_t *task, bool alloc_report
     return -1;
   }
 
+#ifndef SINGLE_FRAME
   if (task->nr_frames < task->nr_tasks)
     task->nr_tasks = task->nr_frames;
 
@@ -50,6 +51,7 @@ segment_task_init(int argc, char **argv, segment_task_t *task, bool alloc_report
       return -1;
     }
   }
+#endif
 
   return 0;
 }
@@ -57,8 +59,10 @@ segment_task_init(int argc, char **argv, segment_task_t *task, bool alloc_report
 void
 segment_task_fini(segment_task_t *task)
 {
+#ifndef SINGLE_FRAME
   if (task->reports != NULL)
     free(task->reports);
+#endif
 }
 
 int
@@ -84,7 +88,12 @@ populate_work_queue(void *data, work_t w, bool last)
 
 int
 segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
-              bool init_segdata, report_t *report)
+              bool init_segdata, report_t *report
+#ifdef SINGLE_FRAME
+              ,unsigned char *blur_data, unsigned char *tmp_data,
+              bool *threshold_data, int *integral_data
+#endif
+              )
 {
   char file_path[PATH_MAX];
 
@@ -95,7 +104,11 @@ segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
     return -1;
   }
   if (init_segdata) {
-    if (segdata_init(task, file_path, segdata, w.centroid_x, w.centroid_y) < 0) {
+    if (segdata_init(task, file_path, segdata, w.centroid_x, w.centroid_y
+#ifdef SINGLE_FRAME
+                    ,blur_data, tmp_data, threshold_data, integral_data
+#endif
+                    ) < 0) {
       LOG_ERR("Failed to initialize segdata");
       return -1;
     }
@@ -115,6 +128,7 @@ segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
   return 0;
 }
 
+#ifndef SINGLE_FRAME
 void *
 task_segmenter_queue(void *data)
 {
@@ -407,7 +421,7 @@ task_segmenter(void *data)
   segdata_fini(&segdata);
   return (void *)(unsigned long long)ret;
 }
-
+#endif
 
 /*
  * Helper functions for initialising and
@@ -415,10 +429,18 @@ task_segmenter(void *data)
  */
 
 int
-segdata_init(segment_task_t *args, char *filename, segdata_t *segdata, int x, int y)
+segdata_init(segment_task_t *args, char *filename,
+            segdata_t *segdata, int x, int y
+#ifdef SINGLE_FRAME
+            ,unsigned char *blur_data, unsigned char *tmp_data,
+            bool *threshold_data, int *integral_data
+#endif
+    )
 {
+#ifndef SINGLE_FRAME
   size_t imgbuf_sz;
   unsigned char *imgbuf;
+#endif
 
   if (segdata == NULL) {
     LOG_ERR("segdata_init: Invalid argument passed!");
@@ -436,6 +458,7 @@ segdata_init(segment_task_t *args, char *filename, segdata_t *segdata, int x, in
   if (segdata_reset(segdata, filename, x, y) < 0)
     goto err;
 
+#ifndef SINGLE_FRAME
   /*
    * Initialize all the buffers.
    */
@@ -458,6 +481,12 @@ segdata_init(segment_task_t *args, char *filename, segdata_t *segdata, int x, in
     LOG_ERR("Failed to allocate threshold_data");
     goto err;
   }
+#else
+  segdata->blur_data = blur_data;
+  segdata->tmp_data = tmp_data;
+  segdata->threshold_data = threshold_data;
+  segdata->integral_data = integral_data;
+#endif
 
   segdata->minarea = args->minarea;
   segdata->maxarea = args->maxarea;

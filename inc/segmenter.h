@@ -32,9 +32,17 @@ typedef struct segment_task_s {
   /*
    * Task global data
    */
+#ifndef SINGLE_FRAME
   char project[NAME_MAX];
-  char input_dir[PATH_MAX];
   char input_file[PATH_MAX];
+  int nr_tasks;
+  bool static_job_alloc;
+#else
+  int frame;
+  int centroid_x;
+  int centroid_y;
+#endif
+  char input_dir[PATH_MAX];
   char output_dir[PATH_MAX];
   char outfile[NAME_MAX];
   char logfile[NAME_MAX];
@@ -47,10 +55,9 @@ typedef struct segment_task_s {
   int thresh_winsz;
   float thresh_ratio;
   bool debug_imgs;
-  int nr_tasks;
-  bool static_job_alloc;
   int verbosity;
 
+#ifndef SINGLE_FRAME
   /*
    * per task data
    */
@@ -59,6 +66,7 @@ typedef struct segment_task_s {
   int nr_frames;  // Number of frames to process for this thread
   wq_t *wq;
   report_t *reports;
+#endif
 } segment_task_t;
 
 /*
@@ -109,11 +117,24 @@ int filepath(int padding, int num, char *prefix, char *ext, char *path);
 int segment_task_init(int argc, char **argv, segment_task_t *task, bool alloc_reports);
 void segment_task_fini(segment_task_t *task);
 
+int
+segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
+              bool init_segdata, report_t *report
+#ifdef SINGLE_FRAME
+              ,unsigned char *blur_data, unsigned char *tmp_data,
+              bool *threashold_data, int *integral_data
+#endif
+              );
+
 typedef int (*process_infile_cb_t)(void *, work_t w, bool last);
 int process_infile(char *path, process_infile_cb_t cb, void *data, int nr_frames);
 
 int segdata_init(segment_task_t *args, char *filename,
-                  segdata_t *segdata, int x, int y);
+                  segdata_t *segdata, int x, int y
+#ifdef SINGLE_FRAME
+    ,unsigned char *blur_data, unsigned char *tmp_data, bool *threashold_data, int *integral_data
+#endif
+    );
 int segdata_reset(segdata_t *segdata, char *filename, int x, int y);
 void segdata_fini(segdata_t *segdata);
 
