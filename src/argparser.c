@@ -15,10 +15,6 @@ const char *argp_program_bug_address = "vpillai3@hawk.iit.edu";
 
 static char doc[] = "segmenter -- Application to extract worm centroid from image";
 
-void init_options(prog_args_t *prog_args);
-int validate_options(prog_args_t *prog_args);
-int parse_options(int key, char *arg, struct argp_state *state);
-
 struct argp_option options[] = {
   {"input-dir",         'i', "PATH",      0, "Path to input images."},
   {"output-dir",        'o', "PATH",      0, "Output file path."},
@@ -47,6 +43,8 @@ struct argp_option options[] = {
 #endif
   { 0 }
 };
+
+int parse_options(int key, char *arg, struct argp_state *state);
 
 struct argp argp = {options, parse_options, 0, doc};
 

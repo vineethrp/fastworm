@@ -46,6 +46,9 @@ LDLIBS = -lm -lpthread
 SEGMENT_OBJS =	\
 							segmentmain.o
 
+SEGMENTLIB_OBJS = \
+							segmentlib.o
+
 MAIN_OBJS =       \
             main.o
 
@@ -92,7 +95,7 @@ $(BIN_DIR) $(LIB_DIR) $(SEGMENTER_OBJ_DIR) $(SEGMENTER_DEPS_DIR) $(OMPI_OBJ_DIR)
 $(SEGMENT): $(SEGMENT_OBJS:%.o=$(SEGMENT_OBJ_DIR)/%.o) $(SEGMENTER_OBJS:%.o=$(SEGMENT_OBJ_DIR)/%.o) | $(BIN_DIR)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-$(SEGMENTLIB): $(SEGMENTER_OBJS:%.o=$(SEGMENTLIB_OBJ_DIR)/%.o) | $(LIB_DIR)
+$(SEGMENTLIB): $(SEGMENTLIB_OBJS:%.o=$(SEGMENTLIB_OBJ_DIR)/%.o) $(SEGMENTER_OBJS:%.o=$(SEGMENTLIB_OBJ_DIR)/%.o) | $(LIB_DIR)
 	$(CC) -shared $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 $(SEGMENTER): $(SEGMENTER_OBJS:%.o=$(SEGMENTER_OBJ_DIR)/%.o) $(MAIN_OBJS:%.o=$(SEGMENTER_OBJ_DIR)/%.o) | $(BIN_DIR)

@@ -87,7 +87,7 @@ populate_work_queue(void *data, work_t w, bool last)
 }
 
 int
-segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
+do_segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
               bool init_segdata, report_t *report
 #ifdef SINGLE_FRAME
               ,unsigned char *blur_data, unsigned char *tmp_data,

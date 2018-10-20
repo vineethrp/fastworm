@@ -22,5 +22,8 @@ typedef struct segment_task_s prog_args_t;
 #define PROG_ARGS_DEFAULT_THRESH_RATIO 0.9
 #define PROG_ARGS_DEFAULT_BLUR_RADIUS 3
 
+void init_options(prog_args_t *prog_args);
+int validate_options(prog_args_t *prog_args);
 int parse_arguments(int argc, char *argv[], prog_args_t *prog_args);
+
 

@@ -14,6 +14,7 @@
 #include "argparser.h"
 #include "work_queue.h"
 #include "segmenter.h"
+#include "segmentlib.h"
 
 #define MAX_IMG_WIDTH 3840
 #define MAX_IMG_HEIGHT 2160
@@ -24,51 +25,36 @@ static bool threshold_data[MAX_IMGBUF_SZ];
 static int integral_data[MAX_IMGBUF_SZ];
 
 /*
- * Entry point for single frame segmenter.
+ * Wrapper for a single frame segmentation.
  */
 
 int
-main(int argc, char *argv[])
+segment_frame(int x, int y, int frame, int padding, const char *input_dir)
 {
   int ret = -1;
-  char file_path[PATH_MAX + NAME_MAX];
   segdata_t segdata = { 0 };
   report_t report;
   segment_task_t task = { 0 };
   work_t w = { 0 };
 
-  if (segment_task_init(argc, argv, &task, true) < 0) {
-    fprintf(stderr, "Failed to initialize\n");
-    return ret;
+  if (validate_options(&task) < 0) {
+    fprintf(stderr, "Failed to populate task structure!\n");
+    return -1;
   }
 
-  // create output directory
-  errno = 0;
-  if (mkdir(task.output_dir, 0750) < 0 && errno != EEXIST) {
-    fprintf(stderr, "Failed to create the output directory!\n");
-    goto out;
-  }
-
-  snprintf(file_path, PATH_MAX + NAME_MAX, "%s/%s", task.output_dir, task.logfile);
-  if (log_init(task.verbosity, 0, file_path) < 0) {
-    goto out;
-  }
-
-  w.centroid_x = task.centroid_x;
-  w.centroid_y = task.centroid_y;
-  w.frame = task.frame;
-  w.padding = task.padding;
+  strcpy(task.input_dir, input_dir);
+  w.centroid_x = x;
+  w.centroid_y = y;
+  w.frame = task.frame = frame;
+  w.padding = task.padding = padding;
   if (do_segment_frame(&task, w, &segdata, true, &report,
                     blur_data, tmp_data, threshold_data, integral_data) == 0) {
     printf("%d %d %d %d\n",
         report.frame_id, report.centroid_x, report.centroid_y, report.area);
     ret = 0;
   } else {
-    LOG_ERR("Failed to segment the frame");
+    fprintf(stderr, "Failed to segment the frame");
   }
 
-out:
-
-  log_fini();
-  return ret;
+  return ret == 0 ? report.area : ret;
 }

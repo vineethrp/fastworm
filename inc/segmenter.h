@@ -118,7 +118,7 @@ int segment_task_init(int argc, char **argv, segment_task_t *task, bool alloc_re
 void segment_task_fini(segment_task_t *task);
 
 int
-segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
+do_segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
               bool init_segdata, report_t *report
 #ifdef SINGLE_FRAME
               ,unsigned char *blur_data, unsigned char *tmp_data,
