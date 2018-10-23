@@ -152,7 +152,7 @@ task_segmenter_queue(void *data)
       break;
     }
 
-    if (segment_frame(task, w, &segdata, init_segdata,
+    if (do_segment_frame(task, w, &segdata, init_segdata,
           &task->reports[w.frame]) < 0) {
       LOG_ERR("Failed to segment the frame");
       break;

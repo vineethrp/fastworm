@@ -68,13 +68,13 @@ SEGMENTER_OBJS =                    \
 
 segmenter: $(SEGMENTER)
 
-all: $(SEGMENTER) mpi segment
-
 segment : $(SEGMENT)
 
 segmentlib : $(SEGMENTLIB)
 
 mpi: $(MPISEGMENTER)
+
+all: segmenter mpi segment segmentlib
 
 $(SEGMENTER_OBJ_DIR)/%.o : $(SRC_DIR)/%.c | $(SEGMENTER_OBJ_DIR) $(SEGMENTER_DEPS_DIR)
 	$(CC) $(CFLAGS) -MMD -MF $(SEGMENTER_DEPS_DIR)/$(*F).d -c -o $@ $<

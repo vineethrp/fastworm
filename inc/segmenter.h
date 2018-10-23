@@ -126,13 +126,10 @@ do_segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
 #endif
               );
 
-typedef int (*process_infile_cb_t)(void *, work_t w, bool last);
-int process_infile(char *path, process_infile_cb_t cb, void *data, int nr_frames);
-
 int segdata_init(segment_task_t *args, char *filename,
                   segdata_t *segdata, int x, int y
 #ifdef SINGLE_FRAME
-    ,unsigned char *blur_data, unsigned char *tmp_data, bool *threashold_data, int *integral_data
+    ,unsigned char *blur_data, unsigned char *tmp_data, bool *threshold_data, int *integral_data
 #endif
     );
 int segdata_reset(segdata_t *segdata, char *filename, int x, int y);
@@ -141,7 +138,13 @@ void segdata_fini(segdata_t *segdata);
 int segdata_process(segdata_t *segdata);
 
 int write_output(char *filepath, report_t *reports, int count);
+
+#ifndef SINGLE_FRAME
+typedef int (*process_infile_cb_t)(void *, work_t w, bool last);
+int process_infile(char *path, process_infile_cb_t cb, void *data, int nr_frames);
+
 void *task_segmenter(void *data);
 int dispatch_segmenter_tasks(segment_task_t *task);
 int dispatch_segmenter_tasks_static(segment_task_t *task);
 int dispatch_segmenter_tasks_wq(segment_task_t *task);
+#endif
