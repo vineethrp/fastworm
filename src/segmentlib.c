@@ -28,18 +28,20 @@ static int integral_data[MAX_IMGBUF_SZ];
  * Wrapper for a single frame segmentation.
  */
 
-int
+report_t
 segment_frame(int x, int y, int frame, int padding, const char *input_dir)
 {
-  int ret = -1;
   segdata_t segdata = { 0 };
   report_t report;
   segment_task_t task = { 0 };
   work_t w = { 0 };
 
+  // Failure case
+  report.area = -1;
+
   if (validate_options(&task) < 0) {
     fprintf(stderr, "Failed to populate task structure!\n");
-    return -1;
+    return report;
   }
 
   strcpy(task.input_dir, input_dir);
@@ -48,13 +50,9 @@ segment_frame(int x, int y, int frame, int padding, const char *input_dir)
   w.frame = task.frame = frame;
   w.padding = task.padding = padding;
   if (do_segment_frame(&task, w, &segdata, true, &report,
-                    blur_data, tmp_data, threshold_data, integral_data) == 0) {
-    printf("%d %d %d %d\n",
-        report.frame_id, report.centroid_x, report.centroid_y, report.area);
-    ret = 0;
-  } else {
+                    blur_data, tmp_data, threshold_data, integral_data) < 0) {
     fprintf(stderr, "Failed to segment the frame");
   }
 
-  return ret == 0 ? report.area : ret;
+  return report;
 }
