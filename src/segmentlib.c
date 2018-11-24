@@ -29,7 +29,8 @@ static int integral_data[MAX_IMGBUF_SZ];
  */
 
 report_t
-segment_frame(int x, int y, int frame, int padding, const char *input_dir)
+segment_frame(int x, int y, int frame, int padding,
+    int minarea, int maxarea, int srch_winsz, const char *input_dir)
 {
   segdata_t segdata = { 0 };
   report_t report;
@@ -39,6 +40,9 @@ segment_frame(int x, int y, int frame, int padding, const char *input_dir)
   // Failure case
   report.area = -1;
 
+  task.minarea = minarea;
+  task.maxarea = maxarea;
+  task.srch_winsz =  srch_winsz;
   if (validate_options(&task) < 0) {
     fprintf(stderr, "Failed to populate task structure!\n");
     return report;
