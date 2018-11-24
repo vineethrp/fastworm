@@ -1,3 +1,6 @@
 *.txt
 *.o
 *.tic
+pkgIndex.tcl
+segment.so
+

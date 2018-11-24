@@ -4745,7 +4745,10 @@ _wrap_segment_frame(ClientData clientData SWIGUNUSED, Tcl_Interp *interp, int ob
   int arg2 ;
   int arg3 ;
   int arg4 ;
-  char *arg5 = (char *) 0 ;
+  int arg5 ;
+  int arg6 ;
+  int arg7 ;
+  char *arg8 = (char *) 0 ;
   int val1 ;
   int ecode1 = 0 ;
   int val2 ;
@@ -4754,12 +4757,18 @@ _wrap_segment_frame(ClientData clientData SWIGUNUSED, Tcl_Interp *interp, int ob
   int ecode3 = 0 ;
   int val4 ;
   int ecode4 = 0 ;
-  int res5 ;
-  char *buf5 = 0 ;
-  int alloc5 = 0 ;
+  int val5 ;
+  int ecode5 = 0 ;
+  int val6 ;
+  int ecode6 = 0 ;
+  int val7 ;
+  int ecode7 = 0 ;
+  int res8 ;
+  char *buf8 = 0 ;
+  int alloc8 = 0 ;
   report_t result;
   
-  if (SWIG_GetArgs(interp, objc, objv,"ooooo:segment_frame x y frame padding input_dir ",(void *)0,(void *)0,(void *)0,(void *)0,(void *)0) == TCL_ERROR) SWIG_fail;
+  if (SWIG_GetArgs(interp, objc, objv,"oooooooo:segment_frame x y frame padding minarea maxarea srch_winsz input_dir ",(void *)0,(void *)0,(void *)0,(void *)0,(void *)0,(void *)0,(void *)0,(void *)0) == TCL_ERROR) SWIG_fail;
   ecode1 = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(objv[1], &val1);
   if (!SWIG_IsOK(ecode1)) {
     SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "segment_frame" "', argument " "1"" of type '" "int""'");
@@ -4780,17 +4789,32 @@ _wrap_segment_frame(ClientData clientData SWIGUNUSED, Tcl_Interp *interp, int ob
     SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "segment_frame" "', argument " "4"" of type '" "int""'");
   } 
   arg4 = (int)(val4);
-  res5 = SWIG_AsCharPtrAndSize(objv[5], &buf5, NULL, &alloc5);
-  if (!SWIG_IsOK(res5)) {
-    SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "segment_frame" "', argument " "5"" of type '" "char const *""'");
+  ecode5 = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(objv[5], &val5);
+  if (!SWIG_IsOK(ecode5)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode5), "in method '" "segment_frame" "', argument " "5"" of type '" "int""'");
+  } 
+  arg5 = (int)(val5);
+  ecode6 = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(objv[6], &val6);
+  if (!SWIG_IsOK(ecode6)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode6), "in method '" "segment_frame" "', argument " "6"" of type '" "int""'");
+  } 
+  arg6 = (int)(val6);
+  ecode7 = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(objv[7], &val7);
+  if (!SWIG_IsOK(ecode7)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode7), "in method '" "segment_frame" "', argument " "7"" of type '" "int""'");
+  } 
+  arg7 = (int)(val7);
+  res8 = SWIG_AsCharPtrAndSize(objv[8], &buf8, NULL, &alloc8);
+  if (!SWIG_IsOK(res8)) {
+    SWIG_exception_fail(SWIG_ArgError(res8), "in method '" "segment_frame" "', argument " "8"" of type '" "char const *""'");
   }
-  arg5 = (char *)(buf5);
-  result = segment_frame(arg1,arg2,arg3,arg4,(char const *)arg5);
+  arg8 = (char *)(buf8);
+  result = segment_frame(arg1,arg2,arg3,arg4,arg5,arg6,arg7,(char const *)arg8);
   Tcl_SetObjResult(interp,SWIG_NewInstanceObj((report_t *)memcpy((report_t *)malloc(sizeof(report_t)),&result,sizeof(report_t)), SWIGTYPE_p_report_s, SWIG_POINTER_OWN | 0 ));
-  if (alloc5 == SWIG_NEWOBJ) free((char*)buf5);
+  if (alloc8 == SWIG_NEWOBJ) free((char*)buf8);
   return TCL_OK;
 fail:
-  if (alloc5 == SWIG_NEWOBJ) free((char*)buf5);
+  if (alloc8 == SWIG_NEWOBJ) free((char*)buf8);
   return TCL_ERROR;
 }
 

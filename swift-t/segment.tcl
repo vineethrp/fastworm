@@ -1,9 +1,9 @@
 namespace eval segment {
 
-  proc segment_tcl { x y f p input_dir } {
+  proc segment_tcl { x y f p mina maxa swz input_dir } {
 
     # Call the C function
-    set ret [ segment_frame $x $y $f $p $input_dir ]
+    set ret [ segment_frame $x $y $f $p $mina $maxa $swz $input_dir ]
 
     # Return a Tcl Dict. Swift will see it as an array.
     return [ \
