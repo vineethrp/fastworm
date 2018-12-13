@@ -754,7 +754,7 @@ write_output(char *filepath, report_t *reports, int nr_frames)
     return -1;
   }
   for (i = 0; i < nr_frames; i++) {
-    fprintf(f, "%d, %d, %d, %d\n",
+    fprintf(f, "%d,%d,%d,%d\n",
         reports[i].frame_id, reports[i].centroid_y,
         reports[i].centroid_x, reports[i].area);
   }
