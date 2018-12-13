@@ -16,30 +16,31 @@ const char *argp_program_bug_address = "vpillai3@hawk.iit.edu";
 static char doc[] = "segmenter -- Application to extract worm centroid from image";
 
 struct argp_option options[] = {
-  {"input-dir",         'i', "PATH",      0, "Path to input images."},
-  {"output-dir",        'o', "PATH",      0, "Output file path."},
-  {"padding",           'p', "NUMBER",    0, "Number of digits in the file name."},
-  {"extension",         'e', "STRING",    0, "Extension of the image files."},
-  {"minarea",           'a', "NUMBER",    0, "The lower bound for a candidate worm component."},
-  {"maxarea",           'A', "NUMBER",    0, "The upper bound for a candidate worm component."},
-  {"search-winsz",      'S', "NUMBER",    0, "Width and height of crop area."},
+  {"input-dir",         'i', "PATH",      0, "Path to input images"},
+  {"output-dir",        'o', "PATH",      0, "Output file path"},
+  {"padding",           'p', "NUMBER",    0, "Number of digits in the file name"},
+  {"extension",         'e', "STRING",    0, "Extension of the image files"},
+  {"minarea",           'a', "NUMBER",    0, "The lower bound for a candidate worm component"},
+  {"maxarea",           'A', "NUMBER",    0, "The upper bound for a candidate worm component"},
+  {"search-winsz",      'S', "NUMBER",    0, "Width and height of crop area"},
   {"blur-winsz",        'b', "NUMBER",    0, "Width and height of the sliding window in the box blur."},
-  {"thresh-winsz",      't', "NUMBER",    0, "Width and height of the sliding window in the dynamic threshold."},
-  {"thresh-ratio",      'T', "FLOAT",     0, "Pixel intensity."},
-  {"logfile",           'l', "FILE NAME", 0, "Path to log file."},
-  {"verbose",           'v', 0,           0, "Produce verbose output."},
+  {"static-threshold",  'u', 0,           0, "Use static threshold algorithm. Default is dynamic threshold"},
+  {"thresh-winsz",      't', "NUMBER",    0, "Width and height of the sliding window in the dynamic threshold"},
+  {"thresh-ratio",      'T', "FLOAT",     0, "Pixel intensity"},
+  {"logfile",           'l', "FILE NAME", 0, "Path to log file"},
+  {"verbose",           'v', 0,           0, "Produce verbose output"},
   {"debug",             'd', 0,           0, "Enable creation of debug images"},
 #ifdef SINGLE_FRAME
-  {"frame number",      'f',  "NUMBER",    0, "Frame number"},
+  {"frame number",      'f', "NUMBER",    0, "Frame number"},
   {"centroid-x",        'x', "NUMBER",    0, "Centroid x value"},
   {"centroid-y",        'y', "NUMBER",    0, "Centroid y value"},
 #else
   {"input-file",        'I', "PATH",      0, "Path to input log file."},
-  {"output-file",       'O', "FILE NAME", 0, "Output file path."},
-  {"frames",            'f', "FRAMES",    0, "Number of frames to be processed."},
+  {"output-file",       'O', "FILE NAME", 0, "Output file path"},
+  {"frames",            'f', "FRAMES",    0, "Number of frames to be processed"},
   {"jobs",              'j', "NUMBER",    0, "Number of concurrent jobs(threads) to run locally"},
-  {"project",           'P', "NAME",      0, "The name of the project to process."},
-  {"static-job-alloc",  's', 0,           0, "Static job allocation to worker threads."},
+  {"project",           'P', "NAME",      0, "The name of the project to process"},
+  {"static-job-alloc",  's', 0,           0, "Static job allocation to worker threads"},
 #endif
   { 0 }
 };
@@ -79,6 +80,9 @@ parse_options(int key, char *arg, struct argp_state *state)
       break;
     case 's':
       prog_args->static_job_alloc = true;
+      break;
+    case 'u':
+      prog_args->static_threshold = true;
       break;
     case 'j':
       prog_args->nr_tasks = atoi(arg);

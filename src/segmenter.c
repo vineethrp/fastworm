@@ -495,7 +495,10 @@ segdata_init(segment_task_t *args, char *filename,
   segdata->thresh_winsz = args->thresh_winsz;
   segdata->thresh_ratio = args->thresh_ratio;
 
-  segdata->thresh_fn = dynamic_threshold;
+  if (args->static_threshold)
+    segdata->thresh_fn = simple_threshold;
+  else
+    segdata->thresh_fn = dynamic_threshold;
 
   return 0;
 
