@@ -34,7 +34,7 @@ main(int argc, char **argv)
   // create output directory
   errno = 0;
   if (mkdir(task.output_dir, 0750) < 0 && errno != EEXIST) {
-    fprintf(stderr, "Failed to create the output directory!\n");
+    fprintf(stderr, "Failed to create the output directory!: %s\n", strerror(errno));
     goto out;
   }
 
