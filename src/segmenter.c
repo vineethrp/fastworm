@@ -598,7 +598,7 @@ segdata_reset(segdata_t *segdata, char *filename, int x, int y)
     LOG_ERR("Failed to construct blur_filename!");
     goto err;
   }
-  if (sprintf(segdata->binary_filename, DEBUG_IMG_DIR"/thresh_%s", fname) < 0) {
+  if (sprintf(segdata->binary_filename, DEBUG_IMG_DIR"/binary_%s", fname) < 0) {
     LOG_ERR("Failed to construct binary_filename!");
     goto err;
   }
