@@ -29,6 +29,7 @@ struct argp_option options[] = {
   {"logfile",           'l', "FILE NAME", 0, "Path to log file."},
   {"verbose",           'v', 0,           0, "Produce verbose output."},
   {"debug",             'd', 0,           0, "Enable creation of debug images"},
+  {"output-segimg",     'X', 0,           0, "Enable creation of segmented images"},
 #ifdef SINGLE_FRAME
   {"frame number",      'f',  "NUMBER",    0, "Frame number"},
   {"centroid-x",        'x', "NUMBER",    0, "Centroid x value"},
@@ -135,7 +136,10 @@ parse_options(int key, char *arg, struct argp_state *state)
       prog_args->verbosity++;
       break;
     case 'd':
-      prog_args->debug_imgs = true;
+      prog_args->out_img_type |= (OUT_IMG_GREYSCALE | OUT_IMG_SEG_BLUR | OUT_IMG_SEG_BINARY);
+      break;
+    case 'X':
+      prog_args->out_img_type = OUT_IMG_SEG_ORIG_WORM;
       break;
     default:
       return ARGP_ERR_UNKNOWN;
@@ -237,8 +241,8 @@ validate_options(prog_args_t *prog_args)
     fprintf(stdout, "srch_winsz: %d, thresh_winsz: %d, thresh_ratio: %f\n",
         prog_args->srch_winsz, prog_args->thresh_winsz, prog_args->thresh_ratio);
     fprintf(stdout, "nr_tasks: %d\n", prog_args->nr_tasks);
-    fprintf(stdout, "debug_imgs: %d, verbosity: %d\n",
-        prog_args->debug_imgs, prog_args->verbosity);
+    fprintf(stdout, "out_img_type: 0x%X, verbosity: %d\n",
+        prog_args->out_img_type, prog_args->verbosity);
   }
 #endif
 

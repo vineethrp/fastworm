@@ -29,8 +29,8 @@
  * actual segmentation.
  */
 
-static int write_threshold(char *filename,
-    bool *threshold_data, unsigned char *data, int w, int h);
+static int write_segmented_image(char *filename, bool *threshold_data,
+    unsigned char *orig_data, unsigned char *data, int w, int h);
 
 int
 segment_task_init(int argc, char **argv, segment_task_t *task, bool alloc_reports)
@@ -453,7 +453,7 @@ segdata_init(segment_task_t *args, char *filename,
     return -1;
   }
   bzero(segdata, sizeof(segdata_t));
-  segdata->debug_imgs = args->debug_imgs;
+  segdata->out_img_type = args->out_img_type;
 
   if (segdata_reset(segdata, filename, x, y) < 0)
     goto err;
@@ -478,7 +478,7 @@ segdata_init(segment_task_t *args, char *filename,
   }
   segdata->integral_data = (int *)calloc(imgbuf_sz, sizeof(int));
   if (segdata->integral_data == NULL) {
-    LOG_ERR("Failed to allocate threshold_data");
+    LOG_ERR("Failed to allocate integral_data");
     goto err;
   }
 #else
@@ -525,12 +525,17 @@ int
 segdata_reset(segdata_t *segdata, char *filename, int x, int y)
 {
   char *fname = NULL;
+  bool debug_imgs = false;
+  bool seg_imgs = false;
   DEFINE_PROFILE_VARS
 
   if (segdata->img_data != NULL) {
     free(segdata->img_data);
     segdata->height = segdata->width = segdata->channels = 0;
   }
+
+  debug_imgs = segdata->out_img_type & (OUT_DEBUG_IMGS);
+  seg_imgs = segdata->out_img_type & OUT_IMG_SEG_ORIG_WORM;
 
   LOG_DEBUG("Loading %s to memory", filename);
 
@@ -552,7 +557,7 @@ segdata_reset(segdata_t *segdata, char *filename, int x, int y)
   }
 
 
-  if (!segdata->debug_imgs)
+  if (!segdata->out_img_type)
     return 0;
 
   /*
@@ -561,7 +566,13 @@ segdata_reset(segdata_t *segdata, char *filename, int x, int y)
 
   // create debug folder
   errno = 0;
-  if (mkdir(DEBUG_DIR, 0750) < 0 && errno != EEXIST) {
+  if (debug_imgs && mkdir(DEBUG_IMG_DIR, 0750) < 0 && errno != EEXIST) {
+    LOG_ERR("Failed to create the debug directory!");
+    goto err;
+  }
+
+  errno = 0;
+  if (seg_imgs && mkdir(OUT_IMG_DIR, 0750) < 0 && errno != EEXIST) {
     LOG_ERR("Failed to create the debug directory!");
     goto err;
   }
@@ -573,19 +584,24 @@ segdata_reset(segdata_t *segdata, char *filename, int x, int y)
   else
     fname = filename;
 
-  if (sprintf(segdata->greyscale_filename, DEBUG_DIR"/gs_%s", fname) < 0) {
+  if (sprintf(segdata->greyscale_filename, DEBUG_IMG_DIR"/gs_%s", fname) < 0) {
     LOG_ERR("Failed to construct greyscale_filename!");
     goto err;
   }
   stbi_write_jpg(segdata->greyscale_filename, segdata->width,
       segdata->height, 1, segdata->img_data, 0);
 
-  if (sprintf(segdata->blur_filename, DEBUG_DIR"/blur_%s", fname) < 0) {
+  if (sprintf(segdata->blur_filename, DEBUG_IMG_DIR"/blur_%s", fname) < 0) {
     LOG_ERR("Failed to construct blur_filename!");
     goto err;
   }
-  if (sprintf(segdata->threshold_filename, DEBUG_DIR"/thresh_%s", fname) < 0) {
-    LOG_ERR("Failed to construct threshold_filename!");
+  if (sprintf(segdata->binary_filename, DEBUG_IMG_DIR"/thresh_%s", fname) < 0) {
+    LOG_ERR("Failed to construct binary_filename!");
+    goto err;
+  }
+
+  if (sprintf(segdata->seg_filename, OUT_IMG_DIR"/seg_%s", fname) < 0) {
+    LOG_ERR("Failed to construct seg_filename!");
     goto err;
   }
 
@@ -642,7 +658,7 @@ int segdata_process(segdata_t *segdata)
   END_PROFILE("blur")
   LOG_DEBUG("greyscal_blur complete");
 
-  if (segdata->debug_imgs) {
+  if (segdata->out_img_type & OUT_IMG_SEG_BLUR) {
     stbi_write_jpg(segdata->blur_filename, segdata->width,
         segdata->height, 1, segdata->blur_data, 0);
   }
@@ -657,9 +673,13 @@ int segdata_process(segdata_t *segdata)
   END_PROFILE("threshold")
   LOG_DEBUG("Threshold complete");
 
-  if (segdata->debug_imgs) {
-    write_threshold(segdata->threshold_filename,
-        segdata->threshold_data, segdata->tmp_data, w, h);
+  if (segdata->out_img_type & OUT_IMG_SEG_BINARY) {
+    write_segmented_image(segdata->binary_filename,
+        segdata->threshold_data, NULL, segdata->tmp_data, w, h);
+  }
+  if (segdata->out_img_type & OUT_IMG_SEG_ORIG_WORM) {
+    write_segmented_image(segdata->seg_filename,
+        segdata->threshold_data, segdata->img_data, segdata->tmp_data, w, h);
   }
 
   START_PROFILE
@@ -694,19 +714,21 @@ int segdata_process(segdata_t *segdata)
 }
 
 /*
- * Helper function to create the binary image from
- * threshold data.
+ * Helper function to create the segmented image
+ * if orig_data = NULL, fill worm body with white,
+ * else use orginal worm shade.
  */
 static int
-write_threshold(char *filename, bool *threshold_data,
-    unsigned char *data, int w, int h)
+write_segmented_image(char *filename, bool *threshold_data,
+    unsigned char *orig_data, unsigned char *data, int w, int h)
 {
   int i, j;
 
+  memset(data, 0, w * h);
   for (i = 0; i < h; i++) {
     for (j = 0; j < w; j++) {
       if (*(threshold_data + (i * w) + j) == true) {
-        *(data + (i * w) + j) = 255;
+        *(data + (i * w) + j) = orig_data ? *(orig_data + (i * w) + j) : 255;
       } else {
         *(data + (i * w) + j) = 0;
       }
