@@ -49,6 +49,7 @@ typedef struct segment_task_s {
   char input_file[PATH_MAX];
   int nr_tasks;
   bool static_job_alloc;
+  bool static_threshold;
 #else
   int frame;
   int centroid_x;
