@@ -57,7 +57,8 @@ main(int argc, char *argv[])
     goto out;
   }
 
-  sprintf(logfile, "%s/task-%d_%s", task.output_dir, taskid, task.logfile);
+  snprintf(logfile, PATH_MAX - 1, "%.*s/task-%d_%.*s",
+           PATH_MAX - NAME_MAX - 16, task.output_dir, taskid, NAME_MAX, task.logfile);
   if (log_init(task.verbosity, 0, logfile) < 0) {
     goto out;
   }
@@ -173,7 +174,8 @@ mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
   }
 
   LOG_XX_DEBUG("MPI Master writing output file!");
-  sprintf(file_path, "%s/%s", task->output_dir, task->outfile);
+  snprintf(file_path, PATH_MAX - 1, "%.*s/%.*s",
+           PATH_MAX - NAME_MAX - 2, task->output_dir, NAME_MAX, task->outfile);
   write_output(file_path, task->reports, actual_nr_frames);
   return 0;
 }
