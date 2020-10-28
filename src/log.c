@@ -74,7 +74,7 @@ get_current_asciitime(char *time_buf)
 	struct timeval tv;
 	time_t nowtime;
 	struct tm *nowtm;
-	char buf[TIME_STR_LEN];
+	char buf[TIME_STR_LEN - 7];
 
 	if (buf == NULL)
 		return -1;
