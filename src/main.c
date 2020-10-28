@@ -24,6 +24,9 @@ main(int argc, char **argv)
 {
   int ret = -1;
   char file_path[PATH_MAX + NAME_MAX];
+#ifdef PROFILE_SEGMENTER
+  char profile_file_path[PATH_MAX + NAME_MAX];
+#endif
   segment_task_t task = { 0 };
 
   if (segment_task_init(argc, argv, &task, true) < 0) {
@@ -51,7 +54,14 @@ main(int argc, char **argv)
      * Print the results returned by all workers.
      */
     snprintf(file_path, PATH_MAX + NAME_MAX, "%s/%s", task.output_dir, task.outfile);
-    write_output(file_path, task.reports, task.nr_frames);
+#ifdef PROFILE_SEGMENTER
+    snprintf(profile_file_path, PATH_MAX + NAME_MAX, "%s/%s", task.output_dir, task.proffile);
+#endif
+    write_output(file_path,
+#ifdef PROFILE_SEGMENTER
+		 profile_file_path,
+#endif
+		 task.reports, task.nr_frames);
   }
 
   ret = 0;

@@ -124,6 +124,9 @@ do_segment_frame(segment_task_t *task, work_t w, segdata_t *segdata,
   report->centroid_x = segdata->centroid_x;
   report->centroid_y = segdata->centroid_y;
   report->area = segdata->area;
+#ifdef PROFILE_SEGMENTER
+  report->pd = segdata->pd;
+#endif
 
   return 0;
 }
@@ -545,7 +548,7 @@ segdata_reset(segdata_t *segdata, char *filename, int x, int y)
   START_PROFILE
   segdata->img_data = stbi_load(filename, &segdata->width,
       &segdata->height, &segdata->channels, 1);
-  END_PROFILE("imgload")
+  END_PROFILE(PROFILE_IMGLOAD, segdata->pd)
 
   if (segdata->img_data == NULL) {
     LOG_ERR("Failed to load the image to memory!");
@@ -658,7 +661,7 @@ int segdata_process(segdata_t *segdata)
     LOG_ERR("Failed to blur the image");
     return -1;
   }
-  END_PROFILE("blur")
+  END_PROFILE(PROFILE_IMGBLUR, segdata->pd)
   LOG_DEBUG("greyscal_blur complete");
 
   if (segdata->out_img_type & OUT_IMG_SEG_BLUR) {
@@ -673,7 +676,7 @@ int segdata_process(segdata_t *segdata)
     LOG_ERR("Thresholding failed!");
     return -1;
   }
-  END_PROFILE("threshold")
+  END_PROFILE(PROFILE_THRESHOLD, segdata->pd)
   LOG_DEBUG("Threshold complete");
 
   if (segdata->out_img_type & OUT_IMG_SEG_BINARY) {
@@ -688,7 +691,7 @@ int segdata_process(segdata_t *segdata)
   START_PROFILE
   largest = largest_component(segdata->threshold_data,
       x1, y1, x2, y2, w, h);
-  END_PROFILE("largestcomponent")
+  END_PROFILE(PROFILE_LC, segdata->pd)
   LOG_DEBUG("largestcomponent completed");
 
   if (largest.count <= 0) {
@@ -767,19 +770,45 @@ filepath(int padding, int num, char *prefix, char *ext, char *path)
  * <centroid width(x)> <centroid height(y)> <area>
  */
 int
-write_output(char *filepath, report_t *reports, int nr_frames)
+write_output(char *filepath,
+#ifdef PROFILE_SEGMENTER
+	char *profile_filepath,
+#endif
+	report_t *reports, int nr_frames)
 {
   int i;
-  FILE *f = fopen(filepath, "w");
+  FILE *f;
+#ifdef PROFILE_SEGMENTER
+  FILE *prof_f = fopen(profile_filepath, "w");
+
+  if (prof_f == NULL) {
+    fprintf(stderr, "Failed to open profile file\n");
+    return -1;
+  }
+#endif
+
+  f = fopen(filepath, "w");
   if (f == NULL) {
     fprintf(stderr, "Failed to open output file\n");
     return -1;
   }
+
   for (i = 0; i < nr_frames; i++) {
+#ifdef PROFILE_SEGMENTER
+    fprintf(prof_f, "%llu,%llu,%llu,%llu\n",
+        reports[i].pd.data[0], reports[i].pd.data[1],
+        reports[i].pd.data[2], reports[i].pd.data[3]);
+#endif
+
     fprintf(f, "%d,%d,%d,%d\n",
         reports[i].frame_id, reports[i].centroid_y,
         reports[i].centroid_x, reports[i].area);
   }
+
   fclose(f);
+#ifdef PROFILE_SEGMENTER
+  fclose(prof_f);
+#endif
+
   return 0;
 }

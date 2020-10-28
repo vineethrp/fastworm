@@ -5,6 +5,12 @@
 #include "log.h"
 #include "profile.h"
 
+char *profile_data_strs[] = {
+	"IMGLOAD",
+	"IMGBLUR",
+	"THRESHOLD",
+	"LARGEST_COMPONENT",
+};
 
 unsigned long long
 get_ns()

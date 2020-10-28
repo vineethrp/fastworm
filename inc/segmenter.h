@@ -1,6 +1,7 @@
 #pragma once
 
 #include "segmentation.h"
+#include "profile.h"
 
 #define SEGMENTER_VERSION_STR "segmenter 0.1.0"
 
@@ -32,6 +33,9 @@ typedef struct report_s {
   int centroid_y;
   int centroid_x;
   int area;
+#ifdef PROFILE_SEGMENTER
+  profile_data_t pd;
+#endif
 } report_t;
 
 /*
@@ -59,6 +63,9 @@ typedef struct segment_task_s {
   char output_dir[PATH_MAX];
   char outfile[NAME_MAX];
   char logfile[NAME_MAX];
+#ifdef PROFILE_SEGMENTER
+  char proffile[NAME_MAX];
+#endif
   char ext[EXT_MAX];
   int padding;
   int minarea;
@@ -124,6 +131,10 @@ typedef struct segdata_s {
   int centroid_x;
   int centroid_y;
   int area;
+
+#ifdef PROFILE_SEGMENTER
+  profile_data_t pd;
+#endif
 } segdata_t;
 
 int filepath(int padding, int num, char *prefix, char *ext, char *path);
@@ -151,7 +162,11 @@ void segdata_fini(segdata_t *segdata);
 
 int segdata_process(segdata_t *segdata);
 
-int write_output(char *filepath, report_t *reports, int count);
+int write_output(char *filepath, 
+#ifdef PROFILE_SEGMENTER
+		char *profile_filepath,
+#endif
+		report_t *reports, int count);
 
 #ifndef SINGLE_FRAME
 typedef int (*process_infile_cb_t)(void *, work_t w, bool last);

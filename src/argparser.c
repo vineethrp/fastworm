@@ -28,6 +28,9 @@ struct argp_option options[] = {
   {"thresh-winsz",      't', "NUMBER",    0, "Width and height of the sliding window in the dynamic threshold"},
   {"thresh-ratio",      'T', "FLOAT",     0, "Pixel intensity"},
   {"logfile",           'l', "FILE NAME", 0, "Path to log file"},
+#ifdef PROFILE_SEGMENTER
+  {"proffile",           1,  "FILE NAME", 0, "Path to profile data file"},
+#endif
   {"verbose",           'v', 0,           0, "Produce verbose output"},
   {"debug",             'd', 0,           0, "Enable creation of debug images"},
   {"output-segimg",     'X', 0,           0, "Enable creation of segmented images"},
@@ -79,6 +82,11 @@ parse_options(int key, char *arg, struct argp_state *state)
     case 'O':
       strcpy(prog_args->outfile, arg);
       break;
+#ifdef PROFILE_SEGMENTER
+    case 1:	/* Profile file */
+      strcpy(prog_args->proffile, arg);
+      break;
+#endif
     case 's':
       prog_args->static_job_alloc = true;
       break;
@@ -196,6 +204,12 @@ validate_options(prog_args_t *prog_args)
     strcpy(prog_args->logfile, PROG_ARGS_DEFAULT_LOGFILE);
   }
 
+#ifdef PROFILE_SEGMENTER
+  if (prog_args->proffile[0] == 0) {
+    strcpy(prog_args->proffile, PROG_ARGS_DEFAULT_PROFILEFILE);
+  }
+#endif
+
   if (prog_args->padding == 0) {
     prog_args->padding = PROG_ARGS_DEFAULT_PADDING;
   }
@@ -240,6 +254,9 @@ validate_options(prog_args_t *prog_args)
     }
     fprintf(stdout, "Output file: %s, log file: %s\n",
         prog_args->outfile, prog_args->logfile);
+#ifdef PROFILE_SEGMENTER
+    fprintf(stdout, "Profile file: %s\n", prog_args->proffile);
+#endif
     fprintf(stdout, "minarea: %d, maxarea: %d, blur_winsz: %d\n",
         prog_args->minarea, prog_args->maxarea, prog_args->blur_winsz);
     fprintf(stdout, "srch_winsz: %d, thresh_winsz: %d, thresh_ratio: %f\n",
