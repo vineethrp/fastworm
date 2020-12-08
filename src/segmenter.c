@@ -232,6 +232,10 @@ out:
 int
 dispatch_segmenter_tasks_wq(segment_task_t *task)
 {
+  pthread_t *thrs = NULL;
+  int nr_tasks = task->nr_tasks;
+  int ret = -1;
+
   task->wq = wq_init(WORK_QUEUE_DEFAULT_CAP);
   if (task->wq == NULL) {
     LOG_ERR("Failed to initialize the work queue");
@@ -242,8 +246,16 @@ dispatch_segmenter_tasks_wq(segment_task_t *task)
    * start nr_tasks - 1 threads (this main thread also does job!)
    *
    */
-  pthread_t thrs[TASKS_MAX];
-  for (int i = 0; i < task->nr_tasks - 1; i++) {
+  if (nr_tasks > 1)
+	  nr_tasks--;
+
+  thrs = calloc(nr_tasks, sizeof(pthread_t));
+  if (thrs == NULL) {
+    LOG_ERR("Failed to allocate thread structures\n");
+    goto err;
+  }
+
+  for (int i = 0; i < nr_tasks; i++) {
     LOG_XX_DEBUG("Creating Thread %d", i);
     if (pthread_create(&thrs[i], NULL, task_segmenter_queue,
           (void *)task) < 0) {
@@ -258,14 +270,15 @@ dispatch_segmenter_tasks_wq(segment_task_t *task)
   /*
    * Rest of the work in Main thread!
    */
-  if (task_segmenter_queue(task) != (void *)0) {
+  if (task->nr_tasks > 1 &&
+      task_segmenter_queue(task) != (void *)0) {
     LOG_ERR("Main segmenter task failed");
   }
 
   /*
    * Wait for all worker threads!
    */
-  for (int i = 0; i < task->nr_tasks - 1; i++) {
+  for (int i = 0; i < nr_tasks; i++) {
     long long ret_val = 0;
     pthread_join(thrs[i], (void *)ret_val);
     if (ret_val != 0) {
@@ -273,9 +286,12 @@ dispatch_segmenter_tasks_wq(segment_task_t *task)
       goto err;
     }
   }
-  return 0;
+
+  ret = 0;
 err:
-  return -1;
+  if (thrs)
+    free(thrs);
+  return ret;
 }
 
 /*

@@ -11,7 +11,7 @@
 
 #define OUT_IMG_DIR "segmented_images"
 
-#define TASKS_MAX 128
+#define TASKS_MAX 512
 
 typedef enum {
   OUT_IMG_NONE = 0,
