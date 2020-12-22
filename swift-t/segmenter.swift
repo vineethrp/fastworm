@@ -40,18 +40,17 @@ if (frames > nr_images) {
 string output[];
 for (int i = 0; i < nr_frames; i = i + 1) {
   image = images[i];
-  printf("array: %s\n", image);
   arr = split(image);
   padding = strlen(arr[0]);
   frame = string2int(arr[0]);
   x = string2int(arr[2]);
   y = string2int(arr[3]);
   ret_data = segment(x, y, frame, padding, mina, maxa, swz, input_dir);
-  printf("padding: %d, frame: %d, x: %d, y: %d, area: %d\n",
-         padding, ret_data[0], ret_data[1], ret_data[2], ret_data[3]);
+  //printf("padding: %d, frame: %d, x: %d, y: %d, area: %d\n",
+  //      padding, ret_data[0], ret_data[1], ret_data[2], ret_data[3]);
   output[frame] = frame + ", " + ret_data[1] + ", " + ret_data[2] + ", " + ret_data[3];
 }
 
 file output_f <"output.txt">;
-string out = string_join(output, "\n");
+string out = string_join(output, "\n\n");
 output_f=write(out);
