@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <string.h>
 
 #include "work_queue.h"
 #include "segmenter.h"
@@ -32,19 +33,20 @@ static output_t output; // { status, frame_id, x, y, area }
  * Entry point for msegmenter.
  */
 
+char hostname[MPI_MAX_PROCESSOR_NAME];
+char logfile[PATH_MAX + NAME_MAX + 16];
+
 int
 main(int argc, char *argv[])
 {
   MPI_Datatype report_type;
   int  nr_tasks, taskid, len;
   int  ret = -1;
-  char hostname[MPI_MAX_PROCESSOR_NAME];
-  char logfile[PATH_MAX];
   segment_task_t task = { 0 };
 
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &nr_tasks);
-  MPI_Comm_rank(MPI_COMM_WORLD,&taskid);
+  MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
   MPI_Get_processor_name(hostname, &len);
 
   if (segment_task_init(argc, argv, &task, taskid == TASK_MASTER) < 0) {
@@ -55,7 +57,7 @@ main(int argc, char *argv[])
   // create output directory
   errno = 0;
   if (mkdir(task.output_dir, 0750) < 0 && errno != EEXIST) {
-    fprintf(stderr, "Failed to create the output directory!\n");
+    fprintf(stderr, "Failed to create the output directory %s: %s!\n", task.output_dir, strerror(errno));
     goto out;
   }
 
@@ -127,7 +129,7 @@ mpi_master_distribute(void *data, work_t w, bool last)
 int
 mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
 {
-  char file_path[PATH_MAX];
+  char file_path[PATH_MAX + NAME_MAX];
 
   if (task == NULL) {
     LOG_ERR("Invalid task structure");

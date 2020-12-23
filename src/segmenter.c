@@ -500,11 +500,17 @@ segdata_init(segment_task_t *args, char *filename,
     LOG_ERR("Failed to allocate integral_data");
     goto err;
   }
+
+  if (args->static_threshold)
+    segdata->thresh_fn = simple_threshold;
+  else
+    segdata->thresh_fn = dynamic_threshold;
 #else
   segdata->blur_data = blur_data;
   segdata->tmp_data = tmp_data;
   segdata->threshold_data = threshold_data;
   segdata->integral_data = integral_data;
+  segdata->thresh_fn = dynamic_threshold;
 #endif
 
   segdata->minarea = args->minarea;
@@ -513,11 +519,6 @@ segdata_init(segment_task_t *args, char *filename,
   segdata->blur_winsz = args->blur_winsz;
   segdata->thresh_winsz = args->thresh_winsz;
   segdata->thresh_ratio = args->thresh_ratio;
-
-  if (args->static_threshold)
-    segdata->thresh_fn = simple_threshold;
-  else
-    segdata->thresh_fn = dynamic_threshold;
 
   return 0;
 
