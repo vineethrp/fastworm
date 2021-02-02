@@ -242,13 +242,6 @@ dispatch_segmenter_tasks_wq(segment_task_t *task)
     return -1;
   }
 
-  /*
-   * start nr_tasks - 1 threads (this main thread also does job!)
-   *
-   */
-  if (nr_tasks > 1)
-	  nr_tasks--;
-
   thrs = calloc(nr_tasks, sizeof(pthread_t));
   if (thrs == NULL) {
     LOG_ERR("Failed to allocate thread structures\n");
@@ -266,14 +259,6 @@ dispatch_segmenter_tasks_wq(segment_task_t *task)
 
   process_infile(task->input_file, populate_work_queue,
                   (void *)(task->wq), task->nr_frames);
-
-  /*
-   * Rest of the work in Main thread!
-   */
-  if (task->nr_tasks > 1 &&
-      task_segmenter_queue(task) != (void *)0) {
-    LOG_ERR("Main segmenter task failed");
-  }
 
   /*
    * Wait for all worker threads!
