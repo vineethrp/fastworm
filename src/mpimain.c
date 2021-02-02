@@ -29,12 +29,18 @@ typedef struct output_s {
 static work_t input; // { frame_id, padding, x, y }
 static output_t output; // { status, frame_id, x, y, area }
 
+static int OUTPUT_SZ = sizeof(output) / sizeof(int);
+static int INPUT_SZ = sizeof(input) / sizeof(int);
+
 /*
  * Entry point for msegmenter.
  */
 
 char hostname[MPI_MAX_PROCESSOR_NAME];
 char logfile[PATH_MAX + NAME_MAX + 16];
+#ifdef PROFILE_SEGMENTER
+char profile_file_path[PATH_MAX + NAME_MAX];
+#endif
 
 int
 main(int argc, char *argv[])
@@ -97,17 +103,17 @@ mpi_master_distribute(void *data, work_t w, bool last)
   if (last) {
     input.frame = -1;
     for (int i = 0; i < task->nr_tasks - 1; i++) {
-      MPI_Recv(&output, 5, MPI_INT, MPI_ANY_SOURCE, TAG_OUTPUT, MPI_COMM_WORLD, &status);
+      MPI_Recv(&output, OUTPUT_SZ, MPI_INT, MPI_ANY_SOURCE, TAG_OUTPUT, MPI_COMM_WORLD, &status);
       if (output.status <= 0) {
         task->reports[output.report.frame_id] = output.report;
       }
-      MPI_Send(&input, 4, MPI_INT, status.MPI_SOURCE, TAG_INPUT, MPI_COMM_WORLD);
+      MPI_Send(&input, INPUT_SZ, MPI_INT, status.MPI_SOURCE, TAG_INPUT, MPI_COMM_WORLD);
     }
     return 0;
   }
 
   // Receive request/result and send new job
-  MPI_Recv(&output, 5, MPI_INT, MPI_ANY_SOURCE, TAG_OUTPUT, MPI_COMM_WORLD, &status);
+  MPI_Recv(&output, OUTPUT_SZ, MPI_INT, MPI_ANY_SOURCE, TAG_OUTPUT, MPI_COMM_WORLD, &status);
   LOG_XX_DEBUG("MPI Receiving from slave %d: status=%d, frame_id=%d, x=%d, y=%d, area=%d",
         status.MPI_SOURCE, output.status, output.report.frame_id,
         output.report.centroid_x, output.report.centroid_y, output.report.area);
@@ -121,7 +127,7 @@ mpi_master_distribute(void *data, work_t w, bool last)
 
   input = w;
 
-  MPI_Send(&input, 4, MPI_INT, status.MPI_SOURCE, TAG_INPUT, MPI_COMM_WORLD);
+  MPI_Send(&input, INPUT_SZ, MPI_INT, status.MPI_SOURCE, TAG_INPUT, MPI_COMM_WORLD);
 
   return 0;
 }
@@ -146,7 +152,14 @@ mpi_master(segment_task_t *task, int nr_tasks, MPI_Datatype *report_type)
 
   LOG_XX_DEBUG("MPI Master writing output file!");
   sprintf(file_path, "%s/%s", task->output_dir, task->outfile);
-  write_output(file_path, task->reports, task->nr_frames);
+#ifdef PROFILE_SEGMENTER
+    snprintf(profile_file_path, PATH_MAX + NAME_MAX, "%s/%s", task->output_dir, task->proffile);
+#endif
+  write_output(file_path,
+#ifdef PROFILE_SEGMENTER
+		 profile_file_path,
+#endif
+		 task->reports, task->nr_frames);
   return 0;
 }
 
@@ -164,10 +177,10 @@ mpi_slave(int taskid, segment_task_t *task, MPI_Datatype *report_type)
   while (1) {
     int ret = 0;
     // Send request to master
-    MPI_Send(&output, 5, MPI_INT, TASK_MASTER, TAG_OUTPUT, MPI_COMM_WORLD);
+    MPI_Send(&output, OUTPUT_SZ, MPI_INT, TASK_MASTER, TAG_OUTPUT, MPI_COMM_WORLD);
 
     // Recv job
-    MPI_Recv(&input, 4, MPI_INT, TASK_MASTER, TAG_INPUT, MPI_COMM_WORLD, &status);
+    MPI_Recv(&input, INPUT_SZ, MPI_INT, TASK_MASTER, TAG_INPUT, MPI_COMM_WORLD, &status);
 
     if (input.frame < 0) {
       // Master signalled end.
@@ -200,6 +213,9 @@ mpi_slave(int taskid, segment_task_t *task, MPI_Datatype *report_type)
     output.report.centroid_x =  segdata.centroid_x;
     output.report.centroid_y =  segdata.centroid_y;
     output.report.area =  segdata.area;
+#ifdef PROFILE_SEGMENTER
+    output.report.pd = segdata.pd;
+#endif
   }
 
   return 0;
